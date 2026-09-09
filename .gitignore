@@ -20,3 +20,9 @@ Assistant Screenshots/
 # OS
 .DS_Store
 Thumbs.db
+# Development and test files
+Methodologies.docx
+audio_test.py
+speech_to_text.py
+speech_to_text_practice.py
+test_*.py

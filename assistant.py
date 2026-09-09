@@ -4,6 +4,30 @@ from urllib import response
 
 from dotenv import load_dotenv
 from openai import OpenAI
+from document_tools import find_document, read_document
+from file_organization_tools import organize_folder
+
+from memory_tools import (
+    save_memory,
+    search_memory,
+    read_memories,
+    delete_memory
+)
+
+from study_tools import (
+    create_quiz,
+    explain_topic,
+    generate_study_questions,
+    evaluate_answer
+)
+
+from writing_tools import (
+    improve_writing,
+    correct_grammar,
+    paraphrase_text,
+    summarize_text,
+    write_email
+)
 
 from tools import (
     open_application,
@@ -73,16 +97,91 @@ Your responsibilities:
 11. Do not mention internal tools, function calls, APIs, or system architecture
     unless the user specifically asks.
 12. The user speaks English.
-13. When the user asks for current, recent, live, or up-to-date information,
-    use web search when available.
-14. When using web search, use the search results as evidence and answer
-    based on the information retrieved.
-15. If the user asks for a summary, comparison, or research task, you may
-    perform multiple web searches when necessary.
-16. Do not claim that you searched the web if you did not actually retrieve
+13. When the user asks for current, recent, live, latest, or up-to-date
+    information, use hosted web search.
+14. When the user asks to research, investigate, analyze, compare, or
+    summarize a topic using current information, treat it as a research task.
+15. For research tasks, perform multiple focused web searches when useful.
+    Do not rely on a single search when the topic has multiple important
+    aspects.
+16. For broad research questions, break the topic into useful subtopics
+    before searching.
+17. Use the retrieved web information as evidence. Do not invent facts,
+    sources, statistics, dates, or developments that were not supported by
+    the retrieved information.
+18. When presenting research findings, prioritize the most important
+    information first and clearly distinguish established facts from
+    uncertain or conflicting information.
+19. For comparisons, research the relevant options separately when
+    necessary and then compare them using the retrieved evidence.
+20. If the user asks for a research summary, give a concise spoken summary
+    containing the key findings rather than reading a long article.
+21. Do not claim that you searched the web if you did not actually retrieve
     search results.
-17. For multi-step tasks, continue using available tools until the request
+22. For multi-step tasks, continue using available tools until the request
     is completed or no further tool is necessary.
+23. Match research depth to the user's request:
+    - Simple current question: use a small number of searches.
+    - Broad research request: use several focused searches.
+    - Detailed comparison or investigation: research each major aspect
+      before forming the final answer.
+24. When the user asks to find a document, PDF, Word file, or text file,
+    use find_document.
+25. When the user asks to read, summarize, analyze, or answer questions
+    about a document, use find_document first if the file path is not
+    already known, then use read_document.
+26. Only use read_document for supported document types: PDF, DOCX, and TXT.
+27. When a document is very long, focus on the relevant information and
+    give a concise spoken response rather than reading the entire document.
+28. When the user asks to organize files, use organize_folder with
+    confirmed=false first to show the proposed changes.
+29. Never use confirmed=true unless the user has explicitly confirmed
+    that they want the proposed file changes performed.
+30. Do not interpret a general request such as "organize my Downloads"
+    as permission to immediately move files.
+31. If the user explicitly confirms the proposed organization, use
+    organize_folder with confirmed=true.
+32. Use save_memory when the user explicitly asks you to remember
+    a useful fact, preference, instruction, or piece of information
+    for future conversations.
+33. Use search_memory when information from long-term memory could
+    help answer the user's current request.
+34. Use read_memories when the user asks what you remember about them.
+35. Use delete_memory when the user explicitly asks you to forget
+    a saved memory.
+36. Do not save every statement the user makes. Only save information
+    that is clearly useful for future interactions or explicitly
+    requested to be remembered.
+37. Do not reveal or discuss the internal memory system unless the
+    user asks about it.
+38. When the user asks to be quizzed on a topic, use create_quiz.
+39. When the user asks for an explanation of a topic for studying,
+    use explain_topic.
+40. When the user asks for practice questions, use
+    generate_study_questions.
+41. When the user provides an answer to a study question and asks
+    for evaluation, use evaluate_answer.
+42. During an interactive quiz, ask one question at a time and wait
+    for the user's answer before continuing.
+43. When evaluating an answer, clearly explain whether it is correct,
+    partially correct, or incorrect, and briefly explain why.
+44. Keep study responses appropriate for spoken conversation and
+    avoid unnecessarily long explanations unless the user asks
+    for detail.
+45. When the user asks to improve, rewrite, or polish text, use
+    improve_writing.
+46. When the user asks to correct grammar, spelling, punctuation,
+    or sentence structure, use correct_grammar.
+47. When the user asks to paraphrase text, use paraphrase_text.
+48. When the user asks for a summary of provided text, use
+    summarize_text.
+49. When the user asks to write an email, use write_email.
+50. Preserve the user's original meaning when editing or
+    paraphrasing text.
+51. Do not invent personal details, names, dates, facts, or
+    experiences when writing emails or other personal content.
+52. Keep writing responses appropriate for spoken conversation
+    unless the user explicitly asks for a longer written output.
 
 Important tool rules:
 
@@ -109,6 +208,469 @@ TOOLS = [
     
         {
         "type": "web_search"
+    },
+        
+    
+        
+    # ---------------------------------------------------------
+    # SAVE MEMORY
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "save_memory",
+        "description": (
+            "Save a useful fact, preference, instruction, or other "
+            "information for future conversations."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "memory": {
+                    "type": "string",
+                    "description": (
+                        "The information that should be permanently remembered."
+                    )
+                }
+            },
+            "required": ["memory"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+
+    # ---------------------------------------------------------
+    # SEARCH MEMORY
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "search_memory",
+        "description": (
+            "Search the assistant's long-term memory for information "
+            "relevant to the user's request."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": (
+                        "The topic or information to search for."
+                    )
+                }
+            },
+            "required": ["query"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+
+    # ---------------------------------------------------------
+    # READ MEMORIES
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "read_memories",
+        "description": (
+            "Read all information currently stored in long-term memory."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+
+    # ---------------------------------------------------------
+    # DELETE MEMORY
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "delete_memory",
+        "description": (
+            "Delete a specific saved memory when the user explicitly "
+            "asks the assistant to forget it."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "memory": {
+                    "type": "string",
+                    "description": (
+                        "The exact memory that should be forgotten."
+                    )
+                }
+            },
+            "required": ["memory"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+        
+    
+    # ---------------------------------------------------------
+    # FIND DOCUMENT
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "find_document",
+        "description": (
+            "Find PDF, DOCX, or TXT documents in the user's "
+            "Desktop, Documents, and Downloads folders."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": (
+                        "The document filename or part of the filename "
+                        "to search for."
+                    )
+                }
+            },
+            "required": ["query"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+
+    # ---------------------------------------------------------
+    # READ DOCUMENT
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "read_document",
+        "description": (
+            "Extract readable text from a PDF, DOCX, or TXT document "
+            "using its full file path."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "The complete path to the document."
+                }
+            },
+            "required": ["path"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+    
+    # ---------------------------------------------------------
+    # CREATE QUIZ
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "create_quiz",
+        "description": (
+            "Start an interactive quiz on a study topic."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "topic": {
+                    "type": "string",
+                    "description": "The topic for the quiz."
+                },
+                "number_of_questions": {
+                    "type": "integer",
+                    "description": "Number of questions, from 1 to 20."
+                },
+                "difficulty": {
+                    "type": "string",
+                    "description": "Quiz difficulty: easy, medium, or hard."
+                }
+            },
+            "required": [
+                "topic",
+                "number_of_questions",
+                "difficulty"
+            ],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+
+    # ---------------------------------------------------------
+    # EXPLAIN TOPIC
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "explain_topic",
+        "description": (
+            "Explain a study topic at a selected difficulty level."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "topic": {
+                    "type": "string",
+                    "description": "The topic to explain."
+                },
+                "level": {
+                    "type": "string",
+                    "description": (
+                        "Explanation level: beginner, intermediate, "
+                        "or advanced."
+                    )
+                }
+            },
+            "required": ["topic", "level"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+
+    # ---------------------------------------------------------
+    # STUDY QUESTIONS
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "generate_study_questions",
+        "description": (
+            "Generate practice questions for a study topic."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "topic": {
+                    "type": "string",
+                    "description": "The study topic."
+                },
+                "number_of_questions": {
+                    "type": "integer",
+                    "description": "Number of questions, from 1 to 20."
+                }
+            },
+            "required": [
+                "topic",
+                "number_of_questions"
+            ],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+
+    # ---------------------------------------------------------
+    # EVALUATE ANSWER
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "evaluate_answer",
+        "description": (
+            "Evaluate a student's answer to a study question."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "question": {
+                    "type": "string",
+                    "description": "The study question."
+                },
+                "answer": {
+                    "type": "string",
+                    "description": "The student's answer."
+                }
+            },
+            "required": ["question", "answer"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+    
+    # ---------------------------------------------------------
+    # IMPROVE WRITING
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "improve_writing",
+        "description": "Improve provided text while preserving its meaning.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "The text to improve."
+                },
+                "style": {
+                    "type": "string",
+                    "description": (
+                        "Writing style: clear, formal, professional, "
+                        "academic, simple, or natural."
+                    )
+                }
+            },
+            "required": ["text", "style"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+
+    # ---------------------------------------------------------
+    # GRAMMAR CORRECTION
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "correct_grammar",
+        "description": "Correct grammar, spelling, punctuation, and sentence structure.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "The text to correct."
+                }
+            },
+            "required": ["text"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+
+    # ---------------------------------------------------------
+    # PARAPHRASE
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "paraphrase_text",
+        "description": "Paraphrase provided text while preserving its meaning.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "The text to paraphrase."
+                },
+                "style": {
+                    "type": "string",
+                    "description": (
+                        "Paraphrasing style: natural, formal, "
+                        "academic, or simple."
+                    )
+                }
+            },
+            "required": ["text", "style"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+
+    # ---------------------------------------------------------
+    # SUMMARIZE
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "summarize_text",
+        "description": "Summarize provided text.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "The text to summarize."
+                },
+                "length": {
+                    "type": "string",
+                    "description": "Summary length: short, medium, or detailed."
+                }
+            },
+            "required": ["text", "length"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+
+    # ---------------------------------------------------------
+    # WRITE EMAIL
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "write_email",
+        "description": "Write an email based on a user's purpose.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "purpose": {
+                    "type": "string",
+                    "description": "The purpose or situation for the email."
+                },
+                "tone": {
+                    "type": "string",
+                    "description": (
+                        "Email tone: professional, formal, friendly, "
+                        "polite, or casual."
+                    )
+                }
+            },
+            "required": ["purpose", "tone"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+    
+    # ---------------------------------------------------------
+    # FILE ORGANIZATION
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "organize_folder",
+        "description": (
+            "Analyze and organize files in a folder by category. "
+            "Use confirmed=false to preview proposed changes. "
+            "Files are only moved when confirmed=true."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "folder": {
+                    "type": "string",
+                    "description": (
+                        "The complete path of the folder to organize."
+                    )
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": (
+                        "Set to true only when the user has explicitly "
+                        "confirmed that the proposed organization should "
+                        "be performed."
+                    )
+                }
+            },
+            "required": ["folder", "confirmed"],
+            "additionalProperties": False
+        },
+        "strict": True
     },
 
     # ---------------------------------------------------------
@@ -518,6 +1080,8 @@ TOOLS = [
         },
         "strict": True
     },
+    
+
 
 
     # ---------------------------------------------------------
@@ -802,6 +1366,132 @@ def ask_llm(user_text):
                     arguments["action"]
                 )
 
+            # -------------------------------------------------
+            # DOCUMENTS
+            # -------------------------------------------------
+
+            elif call.name == "find_document":
+
+                result = find_document(
+                    arguments["query"]
+                )
+
+            elif call.name == "read_document":
+
+                result = read_document(
+                    arguments["path"]
+                )
+                
+                
+            # -------------------------------------------------
+            # FILE ORGANIZATION
+            # -------------------------------------------------
+
+            elif call.name == "organize_folder":
+
+                result = organize_folder(
+                    arguments["folder"],
+                    arguments["confirmed"]
+                )    
+            
+            # -------------------------------------------------
+            # LONG-TERM MEMORY
+            # -------------------------------------------------
+
+            elif call.name == "save_memory":
+
+                result = save_memory(
+                    arguments["memory"]
+                )
+
+            elif call.name == "search_memory":
+
+                result = search_memory(
+                    arguments["query"]
+                )
+
+            elif call.name == "read_memories":
+
+                result = read_memories()
+
+            elif call.name == "delete_memory":
+
+                result = delete_memory(
+                    arguments["memory"]
+                )
+                
+            # -------------------------------------------------
+            # STUDY ASSISTANT
+            # -------------------------------------------------
+
+            elif call.name == "create_quiz":
+
+                result = create_quiz(
+                    arguments["topic"],
+                    arguments["number_of_questions"],
+                    arguments["difficulty"]
+                )
+
+            elif call.name == "explain_topic":
+
+                result = explain_topic(
+                    arguments["topic"],
+                    arguments["level"]
+                )
+
+            elif call.name == "generate_study_questions":
+
+                result = generate_study_questions(
+                    arguments["topic"],
+                    arguments["number_of_questions"]
+                )
+
+            elif call.name == "evaluate_answer":
+
+                result = evaluate_answer(
+                    arguments["question"],
+                    arguments["answer"]
+                )
+                
+            # -------------------------------------------------
+            # WRITING ASSISTANT
+            # -------------------------------------------------
+
+            elif call.name == "improve_writing":
+
+                result = improve_writing(
+                    arguments["text"],
+                    arguments["style"]
+                )
+
+            elif call.name == "correct_grammar":
+
+                result = correct_grammar(
+                    arguments["text"]
+                )
+
+            elif call.name == "paraphrase_text":
+
+                result = paraphrase_text(
+                    arguments["text"],
+                    arguments["style"]
+                )
+
+            elif call.name == "summarize_text":
+
+                result = summarize_text(
+                    arguments["text"],
+                    arguments["length"]
+                )
+
+            elif call.name == "write_email":
+
+                result = write_email(
+                    arguments["purpose"],
+                    arguments["tone"]
+                )
+                
+                
             # -------------------------------------------------
             # FILES & NOTES
             # -------------------------------------------------

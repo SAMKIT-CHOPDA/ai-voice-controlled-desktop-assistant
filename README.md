@@ -1,278 +1,158 @@
 # AI Voice-Controlled Desktop Assistant
 
-A Python-based AI desktop assistant that lets you control your computer and interact with an AI model using natural voice commands.
+> A voice-driven AI agent for Windows that combines speech recognition, LLM reasoning, tool calling, desktop automation, web research, document understanding, file organization, memory, study assistance, and writing assistance.
 
-The project combines voice activity detection, speech recognition, an LLM with function/tool calling, desktop automation, system monitoring, file utilities, clipboard operations, and text-to-speech into a single voice-driven assistant.
+[![Python](https://img.shields.io/badge/Python-3.x-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![OpenAI](https://img.shields.io/badge/LLM-OpenAI-black?logo=openai&logoColor=white)](https://openai.com/)
+[![Platform](https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows&logoColor=white)](https://www.microsoft.com/windows)
+[![Status](https://img.shields.io/badge/Status-Active%20Development-orange)]()
 
-## Project Overview
+---
 
-Unlike a traditional voice assistant that relies on hard-coded commands, this project sends every transcribed request to an LLM. The LLM determines whether the user needs a normal conversational answer or one or more computer tools.
+## 📌 Overview
 
-This makes the project a practical example of an **AI agent that can understand natural language and interact with a desktop environment**.
+This project is a Python-based AI desktop assistant designed to understand natural voice commands and take useful actions on a Windows computer.
 
-## Architecture
+Unlike traditional assistants that depend primarily on fixed commands, every transcribed request is sent to an LLM. The model decides whether to:
 
-```text
-Microphone
-    ↓
-Silero VAD
-    ↓
-faster-whisper
-    ↓
-OpenAI LLM
-    ↓
-Tool Calling / AI Response
-    ↓
-Computer Action
-    ↓
-OpenAI TTS
-    ↓
-Speaker
-```
+- Answer conversationally
+- Search the web
+- Call one or more desktop tools
+- Read a local document
+- Organize files
+- Retrieve or store long-term memory
+- Provide study assistance
+- Perform writing tasks
 
-## Features
+The result is a practical implementation of a **tool-using AI agent** capable of reasoning about requests and interacting with the local desktop environment.
+
+---
+
+# ✨ Key Features
 
 ### 🎙️ Voice Interaction
-
 - Real-time microphone input
-- Streaming voice activity detection using Silero VAD
-- Speech-to-text using faster-whisper
-- Text-to-speech responses using OpenAI TTS
-- Automatic detection of when the user has finished speaking
+- Silero VAD for speech detection
+- faster-whisper for speech-to-text
+- OpenAI TTS for voice responses
+- Automatic detection of the end of an utterance
 
-### 🧠 AI Assistant
-
-- Natural-language understanding
+### 🧠 AI Agent
 - OpenAI Responses API
 - Function/tool calling
-- Automatic tool selection based on the user's request
-- Support for multiple tool calls in a single request
-- Iterative tool execution when additional actions are required
-- Normal conversational responses when no computer action is necessary
+- Automatic tool selection
+- Multiple tool calls
+- Iterative tool execution
+- Multi-turn conversational context
 
-### 🖥️ Computer Control
+### 🔎 Smart Research
+- Current web research
+- Hosted web search
+- Multi-step research
 
+### 📄 Document Understanding
+- PDF reading
+- DOCX reading
+- TXT reading
+- Document search across common Windows folders
+
+### 📁 Smart File Organization
+- Categorizes files into Documents, Images, Videos, Audio, and Archives
+- Preview before execution
+- Explicit confirmation before moving files
+- Duplicate filename handling
+
+### 🧠 Long-Term Memory
+- Save useful preferences and instructions
+- Search memories
+- Read memories
+- Delete memories
+- Persistent local JSON storage
+
+### 📚 Study Assistant
+- Topic explanations
+- Practice questions
+- Interactive quizzes
+- Answer evaluation
+
+### ✍️ Writing Assistant
+- Writing improvement
+- Grammar correction
+- Paraphrasing
+- Summarization
+- Email generation
+
+### 🖥️ Desktop Control
 - Open applications
 - Open websites
-- Search the web
 - Open folders
-- Control system volume
-- Mute/unmute audio
-- Play/pause media
-- Skip to next/previous media
-- Minimize/maximize windows
-- Take screenshots
+- Volume control
+- Mute/unmute
+- Media controls
+- Window controls
+- Screenshots
 
-### 📊 System Information
-
+### 📊 System Monitoring
 - Battery status
 - RAM usage
 - CPU usage
 - Disk usage
-- Wi-Fi/internet connectivity
+- Wi-Fi/internet status
 - Screen resolution
 - General system information
 
-### 📁 Files and Notes
-
-- Search files on common user folders
-- Create timestamped notes
-- Read saved notes
-
-### 📋 Clipboard
-
-- Read clipboard contents
-- Write text to the clipboard
-
-### 🧮 Utilities
-
+### 📋 Productivity
+- File search
+- Notes
+- Clipboard operations
 - Calculator
-- Current date
-- Current time
+- Date and time
 
-## Technologies
+---
 
-| Technology | Purpose |
-|---|---|
-| Python | Core application |
-| OpenAI API | LLM reasoning and text-to-speech |
-| faster-whisper | Speech recognition |
-| Silero VAD | Voice activity detection |
-| sounddevice | Microphone input |
-| PyAutoGUI | Desktop automation |
-| Pyperclip | Clipboard operations |
-| psutil | System monitoring |
-| playsound3 | Audio playback |
-| python-dotenv | Environment variable management |
-
-## Project Structure
+# 🏗️ Architecture
 
 ```text
-Ai-assistant-voice-controlled/
-│
-├── main.py                    # Main application loop
-├── assistant.py               # LLM integration and tool calling
-├── tools.py                   # Desktop and system tools
-├── wake_word.py               # Voice activity detection and transcription
-├── tts.py                     # Text-to-speech
-├── requirements.txt           # Python dependencies
-├── README.md                  # Project documentation
-└── .gitignore                 # Git exclusions
+                 ┌─────────────────┐
+                 │   Microphone    │
+                 └────────┬────────┘
+                          ↓
+                 ┌─────────────────┐
+                 │    Silero VAD   │
+                 └────────┬────────┘
+                          ↓
+                 ┌─────────────────┐
+                 │  faster-whisper │
+                 └────────┬────────┘
+                          ↓
+                 ┌─────────────────┐
+                 │   OpenAI LLM    │
+                 │  Agent Reasoning│
+                 └────────┬────────┘
+                          ↓
+              ┌───────────┴───────────┐
+              ↓                       ↓
+       Direct Answer             Tool Selection
+                                      ↓
+       ┌─────────────────────────────────────────┐
+       │ Desktop │ Web │ Documents │ Files      │
+       │ Memory  │ Study │ Writing │ System     │
+       └────────────────────┬────────────────────┘
+                            ↓
+                       Tool Result
+                            ↓
+                      OpenAI LLM
+                            ↓
+                      OpenAI TTS
+                            ↓
+                         Speaker
 ```
 
-## How It Works
+---
 
-### 1. Voice Input
+# 🧩 Tool Architecture
 
-The microphone continuously provides short audio chunks to the application.
-
-Silero VAD determines whether the user is speaking and detects the end of the utterance.
-
-### 2. Speech Recognition
-
-The recorded speech is passed to **faster-whisper**, which converts the audio into text.
-
-### 3. AI Reasoning
-
-The transcription is sent to the OpenAI Responses API along with the available tools.
-
-The LLM determines whether it should:
-
-- Answer the user directly
-- Call a single tool
-- Call multiple tools
-- Continue with another tool after receiving a previous tool's result
-
-### 4. Tool Execution
-
-When the LLM requests a function, Python executes the corresponding function in `tools.py`.
-
-Examples include opening applications, checking system information, controlling volume, searching files, and taking screenshots.
-
-### 5. Response
-
-The result of the tool is returned to the LLM.
-
-The LLM then generates a natural-language response, which is converted to speech using OpenAI TTS and played through the speakers.
-
-## Setup
-
-### Prerequisites
-
-- Windows
-- Python 3.x
-- A working microphone
-- Speakers or headphones
-- An OpenAI API key
-
-### 1. Clone the repository
-
-```bash
-git clone <repository-url>
-cd Ai-assistant-voice-controlled
-```
-
-### 2. Create a virtual environment
-
-```bash
-python -m venv .venv
-```
-
-### 3. Activate the virtual environment
-
-Windows:
-
-```bash
-.venv\Scripts\activate
-```
-
-### 4. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 5. Configure the OpenAI API key
-
-Create a `.env` file in the project root:
-
-```text
-OPENAI_API_KEY=your_api_key_here
-```
-
-Do not commit the `.env` file to GitHub.
-
-### 6. Run the assistant
-
-```bash
-python main.py
-```
-
-## Example Commands
-
-The assistant understands natural language rather than requiring exact command phrases.
-
-Examples:
-
-```text
-Open Chrome.
-
-What is my battery percentage?
-
-How much RAM am I using?
-
-How much CPU am I using?
-
-How much free storage do I have?
-
-Is my internet working?
-
-What is my screen resolution?
-
-Turn the volume up.
-
-Turn the volume down.
-
-Mute the computer.
-
-Unmute the computer.
-
-Take a screenshot.
-
-Play my music.
-
-Pause the media.
-
-Skip to the next track.
-
-Minimize the current window.
-
-Maximize the current window.
-
-Find my resume.
-
-Create a note saying I have a meeting tomorrow.
-
-Read my notes.
-
-What is currently in my clipboard?
-
-Copy "Hello World" to my clipboard.
-
-What is the current time?
-
-What is today's date?
-
-Calculate 25 * 18.
-
-Open my Downloads folder.
-```
-
-The assistant can also answer normal questions conversationally when a computer action is not required.
-
-## Tool Architecture
-
-The project exposes desktop capabilities to the LLM as structured functions.
+The assistant exposes capabilities to the LLM as structured functions.
 
 ```text
 User Speech
@@ -281,125 +161,427 @@ Speech-to-Text
      ↓
 LLM
      ↓
-┌───────────────────────────────┐
-│        Tool Selection         │
-├───────────────────────────────┤
-│ open_application              │
-│ open_website                  │
-│ search_web                    │
-│ system_info                   │
-│ battery_status                │
-│ memory_usage                  │
-│ cpu_usage                     │
-│ disk_usage                    │
-│ wifi_status                   │
-│ screen_resolution             │
-│ volume_control                │
-│ mute_unmute                   │
-│ take_screenshot               │
-│ media_control                 │
-│ window_control                │
-│ search_files                  │
-│ create_note                   │
-│ read_notes                    │
-│ clipboard_get                 │
-│ clipboard_set                 │
-│ calculate                     │
-└───────────────────────────────┘
+Tool Selection
      ↓
-Python Tool Execution
-     ↓
-Tool Result
-     ↓
-LLM Response
-     ↓
-Text-to-Speech
+┌────────────────────────────────────┐
+│ Desktop Tools                      │
+│ System Tools                       │
+│ Web Search                         │
+│ Document Tools                     │
+│ File Organization Tools            │
+│ Memory Tools                       │
+│ Study Tools                        │
+│ Writing Tools                      │
+└──────────────────┬─────────────────┘
+                   ↓
+             Python Execution
+                   ↓
+              Tool Result
+                   ↓
+                  LLM
+                   ↓
+            Final Response
+                   ↓
+             Text-to-Speech
 ```
 
-## Security
+---
 
-- API keys are stored in `.env` rather than directly in source code.
-- `.env` and `.venv/` are excluded through `.gitignore`.
-- Generated audio files are excluded from version control.
-- The calculator uses a restricted AST-based expression parser instead of executing arbitrary Python code.
-- Desktop actions are performed through explicitly defined tools rather than arbitrary code generated by the LLM.
+# 🛠️ Technologies
 
-> **Important:** This project can control parts of the local computer. Only run it in an environment where you understand and trust the actions being requested.
+| Technology | Purpose |
+|---|---|
+| Python | Core application |
+| OpenAI Responses API | LLM reasoning and tool calling |
+| OpenAI TTS | Voice responses |
+| faster-whisper | Speech recognition |
+| Silero VAD | Voice activity detection |
+| sounddevice | Microphone input |
+| PyAutoGUI | Desktop automation |
+| Pyperclip | Clipboard operations |
+| psutil | System monitoring |
+| PyMuPDF | PDF extraction |
+| python-docx | DOCX extraction |
+| playsound3 | Audio playback |
+| python-dotenv | Environment configuration |
 
-## Current Limitations
+---
 
-- The project currently targets Windows desktop automation.
-- Speech recognition and LLM responses require local/network resources depending on the component.
-- Some applications may use different executable names or require additional handling.
-- Browser automation is currently limited compared with a full browser-control agent.
-- There is currently no persistent conversation memory across application restarts.
-- Sensitive actions do not yet have a dedicated confirmation layer.
-- The project does not currently have a graphical user interface.
+# 📂 Project Structure
 
-## Future Improvements
+```text
+Ai-assistant-voice-controlled/
+│
+├── main.py
+├── assistant.py
+├── tools.py
+├── wake_word.py
+├── tts.py
+│
+├── document_tools.py
+├── file_organization_tools.py
+├── memory_tools.py
+├── study_tools.py
+├── writing_tools.py
+│
+├── requirements.txt
+├── README.md
+└── .gitignore
+```
 
-- Conversation memory
-- Persistent user preferences
-- Persistent long-term memory
-- More advanced multi-step reasoning
-- Improved application detection
-- Confirmation for sensitive computer actions
-- Better error recovery
-- Action and conversation logging
-- Graphical user interface
-- Advanced browser automation
-- Improved speech interaction
-- Wake-word activation
-- Configurable voices and assistant personalities
-- Better handling of ambiguous user requests
+| File | Purpose |
+|---|---|
+| `main.py` | Main voice assistant loop |
+| `assistant.py` | LLM integration and tool orchestration |
+| `tools.py` | Desktop, system, clipboard, notes and utility tools |
+| `wake_word.py` | Voice activity detection and speech recognition |
+| `tts.py` | Text-to-speech |
+| `document_tools.py` | PDF, DOCX and TXT document handling |
+| `file_organization_tools.py` | Safe file organization |
+| `memory_tools.py` | Persistent long-term memory |
+| `study_tools.py` | Study and quiz functionality |
+| `writing_tools.py` | Writing assistance |
 
-## Development Roadmap
+---
 
-### Phase 1 — Core Voice Pipeline
+# 🔄 How It Works
+
+### 1. Voice Input
+
+The microphone continuously supplies audio data.
+
+Silero VAD detects speech and determines when the user has finished speaking.
+
+### 2. Speech Recognition
+
+The recorded audio is transcribed using faster-whisper.
+
+```text
+Audio → faster-whisper → Text
+```
+
+### 3. Agent Reasoning
+
+The transcription is sent to the OpenAI Responses API together with the available tools.
+
+The LLM determines whether to answer directly or call one or more tools.
+
+### 4. Tool Execution
+
+Python executes the requested tool.
+
+For example:
+
+```text
+User:
+"How much RAM am I using?"
+
+        ↓
+
+LLM selects:
+memory_usage()
+
+        ↓
+
+Python executes the function
+
+        ↓
+
+Tool result returned to LLM
+
+        ↓
+
+LLM generates final response
+```
+
+### 5. Voice Response
+
+The final response is converted to speech using OpenAI TTS and played through the speakers.
+
+---
+
+# 🎯 Example Commands
+
+The assistant understands natural language rather than requiring exact command phrases.
+
+### Desktop
+
+```text
+Open Chrome.
+Open my Downloads folder.
+Take a screenshot.
+Minimize the current window.
+Turn the volume up.
+Pause the media.
+```
+
+### System
+
+```text
+What is my battery percentage?
+How much RAM am I using?
+How much CPU am I using?
+How much free storage do I have?
+Is my internet working?
+```
+
+### Documents & Files
+
+```text
+Find my resume.
+Read my project report.
+Summarize my PDF.
+Organize my Downloads folder.
+Show me what files would be organized.
+```
+
+### Research
+
+```text
+Research the latest developments in AI agents.
+Compare current AI models.
+Find the latest information about a technology.
+```
+
+### Memory
+
+```text
+Remember that I prefer concise answers.
+What do you remember about me?
+Forget that preference.
+```
+
+### Study
+
+```text
+Explain neural networks at a beginner level.
+Give me practice questions about machine learning.
+Quiz me on Python OOP.
+Evaluate my answer.
+```
+
+### Writing
+
+```text
+Improve this paragraph in a formal style.
+Correct my grammar.
+Paraphrase this paragraph academically.
+Summarize this text.
+Write a professional email.
+```
+
+---
+
+# 🔐 Safety
+
+The project includes several safety-oriented design choices:
+
+- API keys are stored in `.env`
+- `.env` is excluded from Git
+- `.venv/` is excluded from Git
+- Generated audio files are excluded from Git
+- The calculator uses a restricted AST-based expression parser
+- Desktop actions are performed through explicitly defined tools
+- File organization uses a preview-before-execution workflow
+- File organization requires explicit confirmation before moving files
+- The LLM cannot directly execute arbitrary Python code through the tool system
+
+> **Important:** This project can control parts of the local computer. Only run it in an environment where you understand and trust the requested actions.
+
+---
+
+# 🚀 Installation
+
+## Prerequisites
+
+- Windows
+- Python 3.x
+- Working microphone
+- Speakers or headphones
+- OpenAI API key
+
+## 1. Clone
+
+```bash
+git clone https://github.com/SAMKIT-CHOPDA/ai-voice-controlled-desktop-assistant.git
+cd ai-voice-controlled-desktop-assistant
+```
+
+## 2. Create virtual environment
+
+```bash
+python -m venv .venv
+```
+
+## 3. Activate environment
+
+```bash
+.venv\Scriptsctivate
+```
+
+## 4. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+## 5. Configure API key
+
+Create `.env` in the project root:
+
+```text
+OPENAI_API_KEY=your_api_key_here
+```
+
+**Never commit `.env` to GitHub.**
+
+## 6. Run
+
+```bash
+python main.py
+```
+
+---
+
+# 🗺️ Development Roadmap
+
+## Phase 1 — Core Voice Pipeline
+
 - [x] Microphone input
-- [x] Voice activity detection
-- [x] Speech recognition
-- [x] Text-to-speech
+- [x] Silero voice activity detection
+- [x] faster-whisper speech recognition
+- [x] OpenAI text-to-speech
 
-### Phase 2 — AI Agent
+## Phase 2 — AI Agent
+
 - [x] OpenAI Responses API
 - [x] Function/tool calling
-- [x] Tool execution
+- [x] Automatic tool selection
 - [x] Multiple tool execution
+- [x] Iterative tool execution
+- [x] Conversational context
 
-### Phase 3 — Desktop Capabilities
+## Phase 3 — Desktop Capabilities
+
 - [x] Application control
 - [x] Website opening
+- [x] Web search
 - [x] System monitoring
-- [x] Volume and media control
+- [x] Volume control
+- [x] Media control
 - [x] Window control
 - [x] Screenshot capture
 - [x] File search
 - [x] Notes
 - [x] Clipboard operations
 
-### Phase 4 — Advanced Agent Features
-- [ ] Conversation memory
-- [ ] Persistent preferences
-- [ ] Confirmation system
-- [ ] Improved error recovery
-- [ ] Logging
+## Phase 4 — Intelligence & Productivity ✅
 
-### Phase 5 — User Interface
+### Smart Research
+- [x] Web research
+- [x] Current information retrieval
+- [x] Multi-step research
+
+### Document Understanding
+- [x] PDF reading
+- [x] DOCX reading
+- [x] TXT reading
+- [x] Document search
+
+### File Organization
+- [x] File categorization
+- [x] Preview before moving
+- [x] Confirmation before execution
+- [x] Duplicate filename handling
+
+### Conversation & Memory
+- [x] Multi-turn conversational context
+- [x] Persistent long-term memory
+- [x] Memory search
+- [x] Memory deletion
+
+### Study Assistant
+- [x] Topic explanations
+- [x] Practice questions
+- [x] Interactive quizzes
+- [x] Answer evaluation
+
+### Writing Assistant
+- [x] Writing improvement
+- [x] Grammar correction
+- [x] Paraphrasing
+- [x] Summarization
+- [x] Email generation
+
+## Phase 5 — Advanced Desktop Agent
+
+- [ ] OCR / screen reading
+- [ ] GUI interaction
+- [ ] Context-aware notifications
+- [ ] Developer assistant
+- [ ] Python/package/environment management
+
+## Phase 6 — Productivity Integrations
+
+- [ ] Weather
+- [ ] News and research improvements
+- [ ] Timers and reminders
+- [ ] Calendar integration
+- [ ] Email integration
+- [ ] YouTube search and control
+- [ ] Scheduled system actions
+- [ ] Persistent preferences
+- [ ] Daily briefing
+
+---
+
+# 🔮 Future Improvements
+
+- [ ] More robust multi-step reasoning
+- [ ] Better error recovery
+- [ ] Confirmation for sensitive computer actions
+- [ ] Action and conversation logging
 - [ ] Graphical user interface
 - [ ] Conversation history
 - [ ] Visual tool/action status
-- [ ] Configuration panel
+- [ ] Better screen understanding
+- [ ] Improved browser automation
+- [ ] Interruptible speech
+- [ ] Configurable assistant personality
+- [ ] Improved wake-word support
 
-## Status
+---
 
-**Current Version: Working Prototype**
+# 📈 Current Status
 
-The core voice → AI → tool → response pipeline is functional and supports a broad set of desktop-control, system-information, file, note, and clipboard operations.
+**Phase 4 — Intelligence & Productivity: COMPLETE ✅**
 
-This repository represents the current working foundation for future development into a more capable desktop AI agent.
+The project has evolved from a basic voice-controlled desktop utility into a multi-capability AI desktop agent.
 
-## License
+Current high-level pipeline:
+
+```text
+Voice
+  ↓
+Speech Recognition
+  ↓
+LLM Reasoning
+  ↓
+Tool Selection
+  ↓
+Desktop / Web / Files / Documents
+Memory / Study / Writing
+  ↓
+LLM Response
+  ↓
+Voice Output
+```
+
+The next development stage focuses on advanced desktop-agent capabilities including OCR, GUI interaction, context-aware notifications, developer assistance, and Python environment management.
+
+---
+
+# 📄 License
 
 This project is currently provided for educational and portfolio purposes.
 
