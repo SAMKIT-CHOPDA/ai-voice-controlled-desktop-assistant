@@ -1,5 +1,6 @@
 import json
 import os
+from urllib import response
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -72,6 +73,16 @@ Your responsibilities:
 11. Do not mention internal tools, function calls, APIs, or system architecture
     unless the user specifically asks.
 12. The user speaks English.
+13. When the user asks for current, recent, live, or up-to-date information,
+    use web search when available.
+14. When using web search, use the search results as evidence and answer
+    based on the information retrieved.
+15. If the user asks for a summary, comparison, or research task, you may
+    perform multiple web searches when necessary.
+16. Do not claim that you searched the web if you did not actually retrieve
+    search results.
+17. For multi-step tasks, continue using available tools until the request
+    is completed or no further tool is necessary.
 
 Important tool rules:
 
@@ -95,6 +106,10 @@ Important tool rules:
 # =============================================================
 
 TOOLS = [
+    
+        {
+        "type": "web_search"
+    },
 
     # ---------------------------------------------------------
     # OPEN APPLICATION
@@ -639,8 +654,16 @@ def ask_llm(user_text):
             previous_response_id=conversation_response_id,
             input=user_text
         )
+        
+    MAX_TOOL_ROUNDS = 5
+    tool_round = 0
 
     while True:
+        tool_round += 1
+
+        if tool_round > MAX_TOOL_ROUNDS:
+            conversation_response_id = response.id
+            return "I reached the maximum number of steps while processing your request."
 
         tool_calls = [
             item
@@ -649,8 +672,9 @@ def ask_llm(user_text):
         ]
 
         # -----------------------------------------------------
-        # No tool required
+        # Hosted web search is already handled by OpenAI
         # -----------------------------------------------------
+
 
         if not tool_calls:
 
