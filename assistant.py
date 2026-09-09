@@ -44,6 +44,9 @@ client = OpenAI(
 
 MODEL = "gpt-5.6-luna"
 
+# Stores the latest response ID for conversation memory
+conversation_response_id = None
+
 
 # =============================================================
 # SYSTEM PROMPT
@@ -616,12 +619,26 @@ TOOLS = [
 
 def ask_llm(user_text):
 
-    response = client.responses.create(
-        model=MODEL,
-        instructions=SYSTEM_PROMPT,
-        tools=TOOLS,
-        input=user_text
-    )
+    global conversation_response_id
+
+    if conversation_response_id is None:
+
+        response = client.responses.create(
+            model=MODEL,
+            instructions=SYSTEM_PROMPT,
+            tools=TOOLS,
+            input=user_text
+        )
+
+    else:
+
+        response = client.responses.create(
+            model=MODEL,
+            instructions=SYSTEM_PROMPT,
+            tools=TOOLS,
+            previous_response_id=conversation_response_id,
+            input=user_text
+        )
 
     while True:
 
@@ -637,13 +654,15 @@ def ask_llm(user_text):
 
         if not tool_calls:
 
-            return response.output_text
+            conversation_response_id = response.id
 
-        tool_outputs = []
+            return response.output_text
 
         # -----------------------------------------------------
         # Execute tools
         # -----------------------------------------------------
+        
+        tool_outputs = []
 
         for call in tool_calls:
 
@@ -822,3 +841,9 @@ def ask_llm(user_text):
             previous_response_id=response.id,
             input=tool_outputs
         )
+        
+def reset_conversation():
+
+    global conversation_response_id
+
+    conversation_response_id = None
