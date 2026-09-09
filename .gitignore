@@ -1,0 +1,22 @@
+# Environment
+.env
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Generated audio
+*.wav
+*.mp3
+
+# Generated screenshots
+Assistant Screenshots/
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
