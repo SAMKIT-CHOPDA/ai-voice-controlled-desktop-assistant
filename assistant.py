@@ -27,6 +27,17 @@ from notification_tools import (
     monitoring_status,
 )
 
+from developer_tools import (
+    list_project_files,
+    read_project_file,
+    search_project,
+    write_project_file,
+    run_python_file,
+    run_python_command,
+    git_status,
+    git_diff,
+)
+
 from memory_tools import (
     save_memory,
     search_memory,
@@ -249,6 +260,36 @@ Your responsibilities:
 77. Do not start background monitoring automatically merely because
     the assistant starts. Start it when the user explicitly enables
     context-aware monitoring.
+78. You can act as a developer assistant for the current AI assistant project.
+79. The project tools operate only inside the current project directory.
+80. Use list_project_files when you need to understand the project structure.
+81. Use search_project to locate functions, classes, variables, imports,
+    error messages, or other code references before making assumptions.
+82. Use read_project_file to inspect relevant source code before diagnosing
+    or modifying it.
+83. When debugging an error, inspect the relevant code and error information
+    before proposing a fix.
+84. Use write_project_file only when the user explicitly asks to create,
+    modify, or fix project code.
+85. Before modifying an existing file, read the relevant file first.
+86. Preserve existing functionality when modifying project code.
+    Do not unnecessarily rewrite unrelated parts of a file.
+87. After making a code change, run an appropriate validation or test when
+    possible.
+88. Use run_python_file or run_python_command for Python testing and
+    diagnostics.
+89. Do not claim that code works unless an appropriate test or validation
+    has actually succeeded.
+90. Use git_status or git_diff when the user asks about project changes
+    or Git state.
+91. Do not modify .env, .git, .venv, credentials, API keys, or other
+    protected project data.
+92. Do not execute destructive operating-system commands through the
+    developer tools.
+93. When fixing code, explain briefly what was wrong, what was changed,
+    and whether verification succeeded.
+94. For development tasks, prefer inspecting the existing implementation
+    over guessing how the project is structured.
 
 
 Important tool rules:
@@ -280,6 +321,159 @@ TOOLS = [
         {
         "type": "web_search"
     },
+        
+    # ---------------------------------------------------------
+    # DEVELOPER TOOLS
+    # ---------------------------------------------------------
+        
+{
+    "type": "function",
+    "name": "list_project_files",
+    "description": (
+        "List files in the current AI assistant project. "
+        "Use this to understand the project structure."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False
+    },
+    "strict": True
+},
+
+{
+    "type": "function",
+    "name": "read_project_file",
+    "description": (
+        "Read a text/code file from the current project. "
+        "Use this when inspecting or explaining project code."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "Project-relative file path."
+            }
+        },
+        "required": ["path"],
+        "additionalProperties": False
+    },
+    "strict": True
+},
+
+{
+    "type": "function",
+    "name": "search_project",
+    "description": (
+        "Search project source files for a text string, function name, "
+        "class name, variable, error message, or other code reference."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "Text to search for."
+            }
+        },
+        "required": ["query"],
+        "additionalProperties": False
+    },
+    "strict": True
+},
+
+{
+    "type": "function",
+    "name": "write_project_file",
+    "description": (
+        "Create or replace a project text/code file. "
+        "Use this when the user explicitly asks to create or modify "
+        "a project file."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "Project-relative file path."
+            },
+            "content": {
+                "type": "string",
+                "description": "Complete new file content."
+            }
+        },
+        "required": ["path", "content"],
+        "additionalProperties": False
+    },
+    "strict": True
+},
+
+{
+    "type": "function",
+    "name": "run_python_file",
+    "description": (
+        "Run a Python file inside the current project environment. "
+        "Use this to test or execute project Python code."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "Project-relative Python file path."
+            }
+        },
+        "required": ["path"],
+        "additionalProperties": False
+    },
+    "strict": True
+},
+
+{
+    "type": "function",
+    "name": "run_python_command",
+    "description": (
+        "Run a Python command inside the project's virtual environment. "
+        "Use this for diagnostics, package checks, compilation, or tests."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "command": {
+                "type": "string",
+                "description": "Python code to execute."
+            }
+        },
+        "required": ["command"],
+        "additionalProperties": False
+    },
+    "strict": True
+},
+
+{
+    "type": "function",
+    "name": "git_status",
+    "description": "Show the current Git working tree status.",
+    "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False
+    },
+    "strict": True
+},
+
+{
+    "type": "function",
+    "name": "git_diff",
+    "description": "Show the current unstaged Git changes.",
+    "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False
+    },
+    "strict": True
+},
 
     # ---------------------------------------------------------
     # NOTIFICATION TOOLS
@@ -1802,6 +1996,53 @@ def ask_llm(user_text):
                     arguments["folder"],
                     arguments["confirmed"]
                 )    
+            
+            # -------------------------------------------------
+            # DEVELOPER ASSISTANT
+            # -------------------------------------------------
+
+            elif call.name == "list_project_files":
+
+                result = list_project_files()
+
+            elif call.name == "read_project_file":
+
+                result = read_project_file(
+                    arguments["path"]
+                )
+
+            elif call.name == "search_project":
+
+                result = search_project(
+                    arguments["query"]
+                )
+
+            elif call.name == "write_project_file":
+
+                result = write_project_file(
+                    arguments["path"],
+                    arguments["content"]
+                )
+
+            elif call.name == "run_python_file":
+
+                result = run_python_file(
+                    arguments["path"]
+                )
+
+            elif call.name == "run_python_command":
+
+                result = run_python_command(
+                    arguments["command"]
+                )
+
+            elif call.name == "git_status":
+
+                result = git_status()
+
+            elif call.name == "git_diff":
+
+                result = git_diff()
             
             # -------------------------------------------------
             # LONG-TERM MEMORY
