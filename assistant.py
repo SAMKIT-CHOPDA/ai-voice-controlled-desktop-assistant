@@ -8,6 +8,18 @@ from document_tools import find_document, read_document
 from file_organization_tools import organize_folder
 from screen_tools import read_screen
 
+from gui_tools import (
+    move_mouse,
+    click_at,
+    double_click_at,
+    type_text,
+    press_key,
+    hotkey,
+    scroll,
+    drag_to,
+    get_mouse_position,
+)
+
 from memory_tools import (
     save_memory,
     search_memory,
@@ -192,6 +204,26 @@ Your responsibilities:
     capture, or save a screenshot.
 56. Do not use take_screenshot when the user wants you to understand
     or read the current screen; use read_screen instead.
+57. Use GUI tools when the user explicitly asks you to interact with
+    the computer interface.
+58. Use read_screen before interacting with an unfamiliar interface
+    when screen information is needed to identify the correct target.
+59. Use click_at for clicking a specific screen location.
+60. Use double_click_at when a double-click is required.
+61. Use type_text to enter text into the currently focused application.
+62. Use press_key for individual keyboard keys and hotkey for keyboard
+    combinations.
+63. Use scroll to scroll the current application.
+64. Use move_mouse when moving the cursor is required.
+65. Use drag_to for drag-and-drop interactions.
+66. Use get_mouse_position when the current cursor position is needed.
+67. For multi-step GUI tasks, perform actions in logical order and use
+    screen information when necessary to verify the interface.
+68. Do not click arbitrary coordinates when the target can be identified
+    more reliably by reading the screen first.
+69. Do not claim that a GUI action succeeded unless the tool reports
+    that the action was executed.     
+
 
 Important tool rules:
 
@@ -1065,7 +1097,193 @@ TOOLS = [
         "strict": True
     },
 
+    # ---------------------------------------------------------
+    # GUI CONTROL
+    # ---------------------------------------------------------
 
+    {
+        "type": "function",
+        "name": "move_mouse",
+        "description": "Move the mouse to a specific screen coordinate.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "type": "integer",
+                    "description": "Horizontal screen coordinate."
+                },
+                "y": {
+                    "type": "integer",
+                    "description": "Vertical screen coordinate."
+                }
+            },
+            "required": ["x", "y"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "click_at",
+        "description": "Click at a specific screen coordinate.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "type": "integer",
+                    "description": "Horizontal screen coordinate."
+                },
+                "y": {
+                    "type": "integer",
+                    "description": "Vertical screen coordinate."
+                }
+            },
+            "required": ["x", "y"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "double_click_at",
+        "description": "Double-click at a specific screen coordinate.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "type": "integer",
+                    "description": "Horizontal screen coordinate."
+                },
+                "y": {
+                    "type": "integer",
+                    "description": "Vertical screen coordinate."
+                }
+            },
+            "required": ["x", "y"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "type_text",
+        "description": "Type text into the currently focused application.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "The text to type."
+                }
+            },
+            "required": ["text"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "press_key",
+        "description": "Press a single keyboard key.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string",
+                    "description": "Keyboard key such as enter, escape, tab, or space."
+                }
+            },
+            "required": ["key"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "hotkey",
+        "description": "Press a keyboard combination such as Ctrl+C or Alt+Tab.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "keys": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Keys to press together."
+                }
+            },
+            "required": ["keys"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "scroll",
+        "description": (
+            "Scroll the current application. "
+            "Positive values scroll up and negative values scroll down."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer",
+                    "description": "Scroll amount. Positive is up, negative is down."
+                }
+            },
+            "required": ["amount"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "drag_to",
+        "description": "Drag the mouse from its current position to a screen coordinate.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "type": "integer",
+                    "description": "Destination horizontal coordinate."
+                },
+                "y": {
+                    "type": "integer",
+                    "description": "Destination vertical coordinate."
+                },
+                "duration": {
+                    "type": "number",
+                    "description": "Duration of the drag in seconds."
+                }
+            },
+            "required": ["x", "y", "duration"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "get_mouse_position",
+        "description": "Get the current mouse cursor position.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+    
+    
     # ---------------------------------------------------------
     # MEDIA CONTROL
     # ---------------------------------------------------------
@@ -1259,7 +1477,7 @@ def ask_llm(user_text):
             input=user_text
         )
         
-    MAX_TOOL_ROUNDS = 5
+    MAX_TOOL_ROUNDS = 15
     tool_round = 0
 
     while True:
@@ -1396,6 +1614,54 @@ def ask_llm(user_text):
                 
             elif call.name == "read_screen":
                 result = read_screen(arguments["mode"])
+                
+            elif call.name == "move_mouse":
+                result = move_mouse(
+                    arguments["x"],
+                    arguments["y"]
+                )
+
+            elif call.name == "click_at":
+                result = click_at(
+                    arguments["x"],
+                    arguments["y"]
+                )
+
+            elif call.name == "double_click_at":
+                result = double_click_at(
+                    arguments["x"],
+                    arguments["y"]
+                )
+
+            elif call.name == "type_text":
+                result = type_text(
+                    arguments["text"]
+                )
+
+            elif call.name == "press_key":
+                result = press_key(
+                    arguments["key"]
+                )
+
+            elif call.name == "hotkey":
+                result = hotkey(
+                    *arguments["keys"]
+                )
+
+            elif call.name == "scroll":
+                result = scroll(
+                    arguments["amount"]
+                )
+
+            elif call.name == "drag_to":
+                result = drag_to(
+                    arguments["x"],
+                    arguments["y"],
+                    arguments["duration"]
+                )
+
+            elif call.name == "get_mouse_position":
+                result = get_mouse_position()
 
             elif call.name == "media_control":
 
