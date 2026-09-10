@@ -20,6 +20,13 @@ from gui_tools import (
     get_mouse_position,
 )
 
+from notification_tools import (
+    send_notification,
+    start_monitoring,
+    stop_monitoring,
+    monitoring_status,
+)
+
 from memory_tools import (
     save_memory,
     search_memory,
@@ -223,6 +230,25 @@ Your responsibilities:
     more reliably by reading the screen first.
 69. Do not claim that a GUI action succeeded unless the tool reports
     that the action was executed.     
+70. The assistant can use context-aware background monitoring to
+    detect important system conditions and notify the user.
+71. Use start_notification_monitoring when the user asks to enable,
+    start, or turn on context-aware system monitoring.
+72. Use stop_notification_monitoring when the user asks to disable,
+    stop, or turn off context-aware system monitoring.
+73. Use notification_monitoring_status when the user asks whether
+    context-aware monitoring is currently active.
+74. Use send_notification when the user explicitly asks you to send
+    a desktop notification.
+75. Background monitoring should not repeatedly notify the user about
+    the same unchanged condition. A condition should trigger a new
+    notification only after it returns to a normal state and becomes
+    abnormal again.
+76. Do not claim that a notification was sent unless the notification
+    tool reports success.
+77. Do not start background monitoring automatically merely because
+    the assistant starts. Start it when the user explicitly enables
+    context-aware monitoring.
 
 
 Important tool rules:
@@ -254,7 +280,81 @@ TOOLS = [
         {
         "type": "web_search"
     },
-        
+
+    # ---------------------------------------------------------
+    # NOTIFICATION TOOLS
+    # ---------------------------------------------------------
+
+    {
+    "type": "function",
+    "name": "send_notification",
+    "description": (
+        "Send a Windows desktop notification to the user. "
+        "Use this when the user explicitly asks the assistant "
+        "to send a notification."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "title": {
+                "type": "string",
+                "description": "Notification title."
+            },
+            "message": {
+                "type": "string",
+                "description": "Notification message."
+            }
+        },
+        "required": ["title", "message"],
+        "additionalProperties": False
+    },
+    "strict": True
+    },
+
+    {
+    "type": "function",
+    "name": "start_notification_monitoring",
+    "description": (
+        "Start background context-aware monitoring for important "
+        "system conditions such as low battery, high CPU usage, "
+        "and high memory usage."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False
+    },
+    "strict": True
+    },
+
+    {
+    "type": "function",
+    "name": "stop_notification_monitoring",
+    "description": (
+        "Stop background context-aware system monitoring."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False
+    },
+    "strict": True
+    },
+
+    {
+    "type": "function",
+    "name": "notification_monitoring_status",
+    "description": (
+        "Check whether context-aware system notification monitoring "
+        "is currently running."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False
+    },
+    "strict": True
+    },
     
         
     # ---------------------------------------------------------
@@ -1761,6 +1861,25 @@ def ask_llm(user_text):
                     arguments["question"],
                     arguments["answer"]
                 )
+                
+            # -------------------------------------------------
+            # NOTIFICATION ASSISTANT
+            # -------------------------------------------------
+                
+            elif call.name == "send_notification":
+                result = send_notification(
+                    arguments["title"],
+                    arguments["message"]
+                )
+
+            elif call.name == "start_notification_monitoring":
+                result = start_monitoring()
+
+            elif call.name == "stop_notification_monitoring":
+                result = stop_monitoring()
+
+            elif call.name == "notification_monitoring_status":
+                result = monitoring_status()
                 
             # -------------------------------------------------
             # WRITING ASSISTANT
