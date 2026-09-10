@@ -7,6 +7,23 @@ from openai import OpenAI
 from document_tools import find_document, read_document
 from file_organization_tools import organize_folder
 from screen_tools import read_screen
+import time
+
+from audit_logger import (
+    log_request,
+    log_response,
+    log_error
+)
+
+from process_tools import (
+    list_processes,
+    find_process,
+    process_details,
+    close_process,
+    restart_process,
+    top_cpu_processes,
+    top_memory_processes,
+)
 
 from gui_tools import (
     move_mouse,
@@ -345,6 +362,7 @@ TOOLS = [
         "type": "web_search"
     },
         
+        
     # ---------------------------------------------------------
     # DEVELOPER TOOLS
     # ---------------------------------------------------------
@@ -497,6 +515,148 @@ TOOLS = [
     },
     "strict": True
 },
+
+    # ---------------------------------------------------------
+    # SYSTEM & PROCESS MANAGER
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "list_processes",
+        "description": (
+            "List currently running Windows processes, ordered by "
+            "resource usage."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Number of processes to return."
+                }
+            },
+            "required": ["limit"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "find_process",
+        "description": (
+            "Find currently running processes matching an application "
+            "or process name."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Application or process name."
+                }
+            },
+            "required": ["name"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "process_details",
+        "description": "Show detailed information about a running process.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "pid": {
+                    "type": "integer",
+                    "description": "Process ID."
+                }
+            },
+            "required": ["pid"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "close_process",
+        "description": (
+            "Close a running application or process. Only use when "
+            "the user explicitly asks to close that application or process."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Application or process name to close."
+                }
+            },
+            "required": ["name"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "restart_process",
+        "description": (
+            "Restart a currently running Windows application. Only use "
+            "when the user explicitly asks to restart that application."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Application name to restart."
+                }
+            },
+            "required": ["name"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "top_cpu_processes",
+        "description": "Show the processes currently using the most CPU.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Number of processes to return."
+                }
+            },
+            "required": ["limit"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "top_memory_processes",
+        "description": "Show the processes currently using the most memory.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Number of processes to return."
+                }
+            },
+            "required": ["limit"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
 
 
     # ---------------------------------------------------------
@@ -1969,534 +2129,662 @@ def ask_llm(user_text):
 
     global conversation_response_id
 
-    if conversation_response_id is None:
+    start_time = time.time()
 
-        response = client.responses.create(
-            model=MODEL,
-            instructions=SYSTEM_PROMPT,
-            tools=TOOLS,
-            input=user_text
+    # ---------------------------------------------------------
+    # AUDIT LOG: USER REQUEST
+    # ---------------------------------------------------------
+
+    log_request(user_text)
+
+    try:
+
+        # -----------------------------------------------------
+        # INITIAL LLM REQUEST
+        # -----------------------------------------------------
+
+        if conversation_response_id is None:
+
+            response = client.responses.create(
+                model=MODEL,
+                instructions=SYSTEM_PROMPT,
+                tools=TOOLS,
+                input=user_text
+            )
+
+        else:
+
+            response = client.responses.create(
+                model=MODEL,
+                instructions=SYSTEM_PROMPT,
+                tools=TOOLS,
+                previous_response_id=conversation_response_id,
+                input=user_text
+            )
+
+        # -----------------------------------------------------
+        # TOOL EXECUTION LOOP
+        # -----------------------------------------------------
+
+        MAX_TOOL_ROUNDS = 15
+        tool_round = 0
+
+        while True:
+
+            tool_round += 1
+
+            # -------------------------------------------------
+            # MAX TOOL ROUND SAFETY
+            # -------------------------------------------------
+
+            if tool_round > MAX_TOOL_ROUNDS:
+
+                conversation_response_id = response.id
+
+                answer = (
+                    "I reached the maximum number of steps "
+                    "while processing your request."
+                )
+
+                log_response(
+                    answer,
+                    status="limit_reached",
+                    duration=time.time() - start_time
+                )
+
+                return answer
+
+            # -------------------------------------------------
+            # FIND TOOL CALLS
+            # -------------------------------------------------
+
+            tool_calls = [
+                item
+                for item in response.output
+                if item.type == "function_call"
+            ]
+
+            # -------------------------------------------------
+            # NO TOOL CALL
+            # FINAL RESPONSE
+            # -------------------------------------------------
+
+            if not tool_calls:
+
+                conversation_response_id = response.id
+
+                answer = response.output_text
+
+                # ---------------------------------------------
+                # AUDIT LOG: FINAL RESPONSE
+                # ---------------------------------------------
+
+                log_response(
+                    answer,
+                    status="success",
+                    duration=time.time() - start_time
+                )
+
+                return answer
+
+            # -------------------------------------------------
+            # EXECUTE TOOLS
+            # -------------------------------------------------
+
+            tool_outputs = []
+
+            for call in tool_calls:
+
+                arguments = json.loads(call.arguments)
+
+                print()
+                print("Tool:", call.name)
+                print("Arguments:", arguments)
+
+                # -------------------------------------------------
+                # BASIC TOOLS
+                # -------------------------------------------------
+
+                if call.name == "open_application":
+
+                    result = open_application(
+                        arguments["application"]
+                    )
+
+                elif call.name == "open_website":
+
+                    result = open_website(
+                        arguments["url"]
+                    )
+
+                elif call.name == "search_web":
+
+                    result = search_web(
+                        arguments["query"]
+                    )
+
+                elif call.name == "get_current_time":
+
+                    result = get_current_time()
+
+                elif call.name == "get_current_date":
+
+                    result = get_current_date()
+
+                elif call.name == "system_info":
+
+                    result = system_info()
+
+                elif call.name == "open_folder":
+
+                    result = open_folder(
+                        arguments["folder"]
+                    )
+
+                elif call.name == "calculate":
+
+                    result = calculate(
+                        arguments["expression"]
+                    )
+
+                # -------------------------------------------------
+                # SYSTEM STATUS
+                # -------------------------------------------------
+
+                elif call.name == "battery_status":
+
+                    result = battery_status()
+
+                elif call.name == "memory_usage":
+
+                    result = memory_usage()
+
+                elif call.name == "cpu_usage":
+
+                    result = cpu_usage()
+
+                elif call.name == "disk_usage":
+
+                    result = disk_usage()
+
+                elif call.name == "wifi_status":
+
+                    result = wifi_status()
+
+                elif call.name == "screen_resolution":
+
+                    result = screen_resolution()
+
+                # -------------------------------------------------
+                # COMPUTER CONTROL
+                # -------------------------------------------------
+
+                elif call.name == "volume_control":
+
+                    result = volume_control(
+                        arguments["action"]
+                    )
+
+                elif call.name == "mute_unmute":
+
+                    result = mute_unmute(
+                        arguments["action"]
+                    )
+
+                elif call.name == "take_screenshot":
+
+                    result = take_screenshot()
+
+                elif call.name == "read_screen":
+
+                    result = read_screen(
+                        arguments["mode"]
+                    )
+
+                elif call.name == "move_mouse":
+
+                    result = move_mouse(
+                        arguments["x"],
+                        arguments["y"]
+                    )
+
+                elif call.name == "click_at":
+
+                    result = click_at(
+                        arguments["x"],
+                        arguments["y"]
+                    )
+
+                elif call.name == "double_click_at":
+
+                    result = double_click_at(
+                        arguments["x"],
+                        arguments["y"]
+                    )
+
+                elif call.name == "type_text":
+
+                    result = type_text(
+                        arguments["text"]
+                    )
+
+                elif call.name == "press_key":
+
+                    result = press_key(
+                        arguments["key"]
+                    )
+
+                elif call.name == "hotkey":
+
+                    result = hotkey(
+                        *arguments["keys"]
+                    )
+
+                elif call.name == "scroll":
+
+                    result = scroll(
+                        arguments["amount"]
+                    )
+
+                elif call.name == "drag_to":
+
+                    result = drag_to(
+                        arguments["x"],
+                        arguments["y"],
+                        arguments["duration"]
+                    )
+
+                elif call.name == "get_mouse_position":
+
+                    result = get_mouse_position()
+
+                elif call.name == "media_control":
+
+                    result = media_control(
+                        arguments["action"]
+                    )
+
+                elif call.name == "window_control":
+
+                    result = window_control(
+                        arguments["action"]
+                    )
+
+                # -------------------------------------------------
+                # DOCUMENTS
+                # -------------------------------------------------
+
+                elif call.name == "find_document":
+
+                    result = find_document(
+                        arguments["query"]
+                    )
+
+                elif call.name == "read_document":
+
+                    result = read_document(
+                        arguments["path"]
+                    )
+
+                # -------------------------------------------------
+                # FILE ORGANIZATION
+                # -------------------------------------------------
+
+                elif call.name == "organize_folder":
+
+                    result = organize_folder(
+                        arguments["folder"],
+                        arguments["confirmed"]
+                    )
+
+                # -------------------------------------------------
+                # DEVELOPER ASSISTANT
+                # -------------------------------------------------
+
+                elif call.name == "list_project_files":
+
+                    result = list_project_files()
+
+                elif call.name == "read_project_file":
+
+                    result = read_project_file(
+                        arguments["path"]
+                    )
+
+                elif call.name == "search_project":
+
+                    result = search_project(
+                        arguments["query"]
+                    )
+
+                elif call.name == "write_project_file":
+
+                    result = write_project_file(
+                        arguments["path"],
+                        arguments["content"]
+                    )
+
+                elif call.name == "run_python_file":
+
+                    result = run_python_file(
+                        arguments["path"]
+                    )
+
+                elif call.name == "run_python_command":
+
+                    result = run_python_command(
+                        arguments["command"]
+                    )
+
+                elif call.name == "git_status":
+
+                    result = git_status()
+
+                elif call.name == "git_diff":
+
+                    result = git_diff()
+
+                # -------------------------------------------------
+                # PYTHON ENVIRONMENT & PACKAGE MANAGEMENT
+                # -------------------------------------------------
+
+                elif call.name == "python_info":
+
+                    result = python_info()
+
+                elif call.name == "list_packages":
+
+                    result = list_packages()
+
+                elif call.name == "package_info":
+
+                    result = package_info(
+                        arguments["package"]
+                    )
+
+                elif call.name == "install_package":
+
+                    result = install_package(
+                        arguments["package"]
+                    )
+
+                elif call.name == "uninstall_package":
+
+                    result = uninstall_package(
+                        arguments["package"]
+                    )
+
+                elif call.name == "upgrade_package":
+
+                    result = upgrade_package(
+                        arguments["package"]
+                    )
+
+                elif call.name == "check_package":
+
+                    result = check_package(
+                        arguments["package"]
+                    )
+
+                elif call.name == "generate_requirements":
+
+                    result = generate_requirements()
+
+                elif call.name == "verify_requirements":
+
+                    result = verify_requirements()
+
+                elif call.name == "check_python_module":
+
+                    result = check_python_module(
+                        arguments["module"]
+                    )
+
+                # -------------------------------------------------
+                # SYSTEM & PROCESS MANAGER
+                # -------------------------------------------------
+
+                elif call.name == "list_processes":
+
+                    result = list_processes(
+                        arguments["limit"]
+                    )
+
+                elif call.name == "find_process":
+
+                    result = find_process(
+                        arguments["name"]
+                    )
+
+                elif call.name == "process_details":
+
+                    result = process_details(
+                        arguments["pid"]
+                    )
+
+                elif call.name == "close_process":
+
+                    result = close_process(
+                        arguments["name"]
+                    )
+
+                elif call.name == "restart_process":
+
+                    result = restart_process(
+                        arguments["name"]
+                    )
+
+                elif call.name == "top_cpu_processes":
+
+                    result = top_cpu_processes(
+                        arguments["limit"]
+                    )
+
+                elif call.name == "top_memory_processes":
+
+                    result = top_memory_processes(
+                        arguments["limit"]
+                    )
+
+                # -------------------------------------------------
+                # LONG-TERM MEMORY
+                # -------------------------------------------------
+
+                elif call.name == "save_memory":
+
+                    result = save_memory(
+                        arguments["memory"]
+                    )
+
+                elif call.name == "search_memory":
+
+                    result = search_memory(
+                        arguments["query"]
+                    )
+
+                elif call.name == "read_memories":
+
+                    result = read_memories()
+
+                elif call.name == "delete_memory":
+
+                    result = delete_memory(
+                        arguments["memory"]
+                    )
+
+                # -------------------------------------------------
+                # STUDY ASSISTANT
+                # -------------------------------------------------
+
+                elif call.name == "create_quiz":
+
+                    result = create_quiz(
+                        arguments["topic"],
+                        arguments["number_of_questions"],
+                        arguments["difficulty"]
+                    )
+
+                elif call.name == "explain_topic":
+
+                    result = explain_topic(
+                        arguments["topic"],
+                        arguments["level"]
+                    )
+
+                elif call.name == "generate_study_questions":
+
+                    result = generate_study_questions(
+                        arguments["topic"],
+                        arguments["number_of_questions"]
+                    )
+
+                elif call.name == "evaluate_answer":
+
+                    result = evaluate_answer(
+                        arguments["question"],
+                        arguments["answer"]
+                    )
+
+                # -------------------------------------------------
+                # NOTIFICATION ASSISTANT
+                # -------------------------------------------------
+
+                elif call.name == "send_notification":
+
+                    result = send_notification(
+                        arguments["title"],
+                        arguments["message"]
+                    )
+
+                elif call.name == "start_notification_monitoring":
+
+                    result = start_monitoring()
+
+                elif call.name == "stop_notification_monitoring":
+
+                    result = stop_monitoring()
+
+                elif call.name == "notification_monitoring_status":
+
+                    result = monitoring_status()
+
+                # -------------------------------------------------
+                # WRITING ASSISTANT
+                # -------------------------------------------------
+
+                elif call.name == "improve_writing":
+
+                    result = improve_writing(
+                        arguments["text"],
+                        arguments["style"]
+                    )
+
+                elif call.name == "correct_grammar":
+
+                    result = correct_grammar(
+                        arguments["text"]
+                    )
+
+                elif call.name == "paraphrase_text":
+
+                    result = paraphrase_text(
+                        arguments["text"],
+                        arguments["style"]
+                    )
+
+                elif call.name == "summarize_text":
+
+                    result = summarize_text(
+                        arguments["text"],
+                        arguments["length"]
+                    )
+
+                elif call.name == "write_email":
+
+                    result = write_email(
+                        arguments["purpose"],
+                        arguments["tone"]
+                    )
+
+                # -------------------------------------------------
+                # FILES & NOTES
+                # -------------------------------------------------
+
+                elif call.name == "search_files":
+
+                    result = search_files(
+                        arguments["query"]
+                    )
+
+                elif call.name == "create_note":
+
+                    result = create_note(
+                        arguments["note"]
+                    )
+
+                elif call.name == "read_notes":
+
+                    result = read_notes()
+
+                # -------------------------------------------------
+                # CLIPBOARD
+                # -------------------------------------------------
+
+                elif call.name == "clipboard_get":
+
+                    result = clipboard_get()
+
+                elif call.name == "clipboard_set":
+
+                    result = clipboard_set(
+                        arguments["text"]
+                    )
+
+                # -------------------------------------------------
+                # UNKNOWN TOOL
+                # -------------------------------------------------
+
+                else:
+
+                    result = "Unknown tool."
+
+                # -------------------------------------------------
+                # SEND TOOL RESULT BACK TO LLM
+                # -------------------------------------------------
+
+                tool_outputs.append({
+                    "type": "function_call_output",
+                    "call_id": call.call_id,
+                    "output": result
+                })
+
+            # -----------------------------------------------------
+            # ASK LLM FOR FINAL RESPONSE
+            # -----------------------------------------------------
+
+            response = client.responses.create(
+                model=MODEL,
+                instructions=SYSTEM_PROMPT,
+                tools=TOOLS,
+                previous_response_id=response.id,
+                input=tool_outputs
+            )
+
+    # ---------------------------------------------------------
+    # ERROR HANDLING + AUDIT LOG
+    # ---------------------------------------------------------
+
+    except Exception as e:
+
+        log_error(e)
+
+        log_response(
+            "An error occurred while processing the request.",
+            status="error",
+            duration=time.time() - start_time
         )
 
-    else:
-
-        response = client.responses.create(
-            model=MODEL,
-            instructions=SYSTEM_PROMPT,
-            tools=TOOLS,
-            previous_response_id=conversation_response_id,
-            input=user_text
-        )
-        
-    MAX_TOOL_ROUNDS = 15
-    tool_round = 0
-
-    while True:
-        tool_round += 1
-
-        if tool_round > MAX_TOOL_ROUNDS:
-            conversation_response_id = response.id
-            return "I reached the maximum number of steps while processing your request."
-
-        tool_calls = [
-            item
-            for item in response.output
-            if item.type == "function_call"
-        ]
-
-        # -----------------------------------------------------
-        # Hosted web search is already handled by OpenAI
-        # -----------------------------------------------------
-
-
-        if not tool_calls:
-
-            conversation_response_id = response.id
-
-            return response.output_text
-
-        # -----------------------------------------------------
-        # Execute tools
-        # -----------------------------------------------------
-        
-        tool_outputs = []
-
-        for call in tool_calls:
-
-            arguments = json.loads(call.arguments)
-
-            print()
-            print("Tool:", call.name)
-            print("Arguments:", arguments)
-
-            # -------------------------------------------------
-            # BASIC TOOLS
-            # -------------------------------------------------
-
-            if call.name == "open_application":
-
-                result = open_application(
-                    arguments["application"]
-                )
-
-            elif call.name == "open_website":
-
-                result = open_website(
-                    arguments["url"]
-                )
-
-            elif call.name == "search_web":
-
-                result = search_web(
-                    arguments["query"]
-                )
-
-            elif call.name == "get_current_time":
-
-                result = get_current_time()
-
-            elif call.name == "get_current_date":
-
-                result = get_current_date()
-
-            elif call.name == "system_info":
-
-                result = system_info()
-
-            elif call.name == "open_folder":
-
-                result = open_folder(
-                    arguments["folder"]
-                )
-
-            elif call.name == "calculate":
-
-                result = calculate(
-                    arguments["expression"]
-                )
-
-            # -------------------------------------------------
-            # SYSTEM STATUS
-            # -------------------------------------------------
-
-            elif call.name == "battery_status":
-
-                result = battery_status()
-
-            elif call.name == "memory_usage":
-
-                result = memory_usage()
-
-            elif call.name == "cpu_usage":
-
-                result = cpu_usage()
-
-            elif call.name == "disk_usage":
-
-                result = disk_usage()
-
-            elif call.name == "wifi_status":
-
-                result = wifi_status()
-
-            elif call.name == "screen_resolution":
-
-                result = screen_resolution()
-
-            # -------------------------------------------------
-            # COMPUTER CONTROL
-            # -------------------------------------------------
-
-            elif call.name == "volume_control":
-
-                result = volume_control(
-                    arguments["action"]
-                )
-
-            elif call.name == "mute_unmute":
-
-                result = mute_unmute(
-                    arguments["action"]
-                )
-
-            elif call.name == "take_screenshot":
-
-                result = take_screenshot()
-                
-            elif call.name == "read_screen":
-                result = read_screen(arguments["mode"])
-                
-            elif call.name == "move_mouse":
-                result = move_mouse(
-                    arguments["x"],
-                    arguments["y"]
-                )
-
-            elif call.name == "click_at":
-                result = click_at(
-                    arguments["x"],
-                    arguments["y"]
-                )
-
-            elif call.name == "double_click_at":
-                result = double_click_at(
-                    arguments["x"],
-                    arguments["y"]
-                )
-
-            elif call.name == "type_text":
-                result = type_text(
-                    arguments["text"]
-                )
-
-            elif call.name == "press_key":
-                result = press_key(
-                    arguments["key"]
-                )
-
-            elif call.name == "hotkey":
-                result = hotkey(
-                    *arguments["keys"]
-                )
-
-            elif call.name == "scroll":
-                result = scroll(
-                    arguments["amount"]
-                )
-
-            elif call.name == "drag_to":
-                result = drag_to(
-                    arguments["x"],
-                    arguments["y"],
-                    arguments["duration"]
-                )
-
-            elif call.name == "get_mouse_position":
-                result = get_mouse_position()
-
-            elif call.name == "media_control":
-
-                result = media_control(
-                    arguments["action"]
-                )
-
-            elif call.name == "window_control":
-
-                result = window_control(
-                    arguments["action"]
-                )
-
-            # -------------------------------------------------
-            # DOCUMENTS
-            # -------------------------------------------------
-
-            elif call.name == "find_document":
-
-                result = find_document(
-                    arguments["query"]
-                )
-
-            elif call.name == "read_document":
-
-                result = read_document(
-                    arguments["path"]
-                )
-                
-                
-            # -------------------------------------------------
-            # FILE ORGANIZATION
-            # -------------------------------------------------
-
-            elif call.name == "organize_folder":
-
-                result = organize_folder(
-                    arguments["folder"],
-                    arguments["confirmed"]
-                )    
-            
-            # -------------------------------------------------
-            # DEVELOPER ASSISTANT
-            # -------------------------------------------------
-
-            elif call.name == "list_project_files":
-
-                result = list_project_files()
-
-            elif call.name == "read_project_file":
-
-                result = read_project_file(
-                    arguments["path"]
-                )
-
-            elif call.name == "search_project":
-
-                result = search_project(
-                    arguments["query"]
-                )
-
-            elif call.name == "write_project_file":
-
-                result = write_project_file(
-                    arguments["path"],
-                    arguments["content"]
-                )
-
-            elif call.name == "run_python_file":
-
-                result = run_python_file(
-                    arguments["path"]
-                )
-
-            elif call.name == "run_python_command":
-
-                result = run_python_command(
-                    arguments["command"]
-                )
-
-            elif call.name == "git_status":
-
-                result = git_status()
-
-            elif call.name == "git_diff":
-
-                result = git_diff()
-                
-            # -------------------------------------------------
-            # PYTHON ENVIRONMENT & PACKAGE MANAGEMENT
-            # -------------------------------------------------
-
-            elif call.name == "python_info":
-
-                result = python_info()
-
-            elif call.name == "list_packages":
-
-                result = list_packages()
-
-            elif call.name == "package_info":
-
-                result = package_info(
-                    arguments["package"]
-                )
-
-            elif call.name == "install_package":
-
-                result = install_package(
-                    arguments["package"]
-                )
-
-            elif call.name == "uninstall_package":
-
-                result = uninstall_package(
-                    arguments["package"]
-                )
-
-            elif call.name == "upgrade_package":
-
-                result = upgrade_package(
-                    arguments["package"]
-                )
-
-            elif call.name == "check_package":
-
-                result = check_package(
-                    arguments["package"]
-                )
-
-            elif call.name == "generate_requirements":
-
-                result = generate_requirements()
-
-            elif call.name == "verify_requirements":
-
-                result = verify_requirements()
-
-            elif call.name == "check_python_module":
-
-                result = check_python_module(
-                    arguments["module"]
-                )
-            
-            # -------------------------------------------------
-            # LONG-TERM MEMORY
-            # -------------------------------------------------
-
-            elif call.name == "save_memory":
-
-                result = save_memory(
-                    arguments["memory"]
-                )
-
-            elif call.name == "search_memory":
-
-                result = search_memory(
-                    arguments["query"]
-                )
-
-            elif call.name == "read_memories":
-
-                result = read_memories()
-
-            elif call.name == "delete_memory":
-
-                result = delete_memory(
-                    arguments["memory"]
-                )
-                
-            # -------------------------------------------------
-            # STUDY ASSISTANT
-            # -------------------------------------------------
-
-            elif call.name == "create_quiz":
-
-                result = create_quiz(
-                    arguments["topic"],
-                    arguments["number_of_questions"],
-                    arguments["difficulty"]
-                )
-
-            elif call.name == "explain_topic":
-
-                result = explain_topic(
-                    arguments["topic"],
-                    arguments["level"]
-                )
-
-            elif call.name == "generate_study_questions":
-
-                result = generate_study_questions(
-                    arguments["topic"],
-                    arguments["number_of_questions"]
-                )
-
-            elif call.name == "evaluate_answer":
-
-                result = evaluate_answer(
-                    arguments["question"],
-                    arguments["answer"]
-                )
-                
-            # -------------------------------------------------
-            # NOTIFICATION ASSISTANT
-            # -------------------------------------------------
-                
-            elif call.name == "send_notification":
-                result = send_notification(
-                    arguments["title"],
-                    arguments["message"]
-                )
-
-            elif call.name == "start_notification_monitoring":
-                result = start_monitoring()
-
-            elif call.name == "stop_notification_monitoring":
-                result = stop_monitoring()
-
-            elif call.name == "notification_monitoring_status":
-                result = monitoring_status()
-                
-            # -------------------------------------------------
-            # WRITING ASSISTANT
-            # -------------------------------------------------
-
-            elif call.name == "improve_writing":
-
-                result = improve_writing(
-                    arguments["text"],
-                    arguments["style"]
-                )
-
-            elif call.name == "correct_grammar":
-
-                result = correct_grammar(
-                    arguments["text"]
-                )
-
-            elif call.name == "paraphrase_text":
-
-                result = paraphrase_text(
-                    arguments["text"],
-                    arguments["style"]
-                )
-
-            elif call.name == "summarize_text":
-
-                result = summarize_text(
-                    arguments["text"],
-                    arguments["length"]
-                )
-
-            elif call.name == "write_email":
-
-                result = write_email(
-                    arguments["purpose"],
-                    arguments["tone"]
-                )
-                
-                
-            # -------------------------------------------------
-            # FILES & NOTES
-            # -------------------------------------------------
-
-            elif call.name == "search_files":
-
-                result = search_files(
-                    arguments["query"]
-                )
-
-            elif call.name == "create_note":
-
-                result = create_note(
-                    arguments["note"]
-                )
-
-            elif call.name == "read_notes":
-
-                result = read_notes()
-
-            # -------------------------------------------------
-            # CLIPBOARD
-            # -------------------------------------------------
-
-            elif call.name == "clipboard_get":
-
-                result = clipboard_get()
-
-            elif call.name == "clipboard_set":
-
-                result = clipboard_set(
-                    arguments["text"]
-                )
-
-            # -------------------------------------------------
-            # UNKNOWN TOOL
-            # -------------------------------------------------
-
-            else:
-
-                result = "Unknown tool."
-
-            # -------------------------------------------------
-            # Send tool result back to the LLM
-            # -------------------------------------------------
-
-            tool_outputs.append({
-                "type": "function_call_output",
-                "call_id": call.call_id,
-                "output": result
-            })
-
-        # -----------------------------------------------------
-        # Ask LLM for final response
-        # -----------------------------------------------------
-
-        response = client.responses.create(
-            model=MODEL,
-            instructions=SYSTEM_PROMPT,
-            tools=TOOLS,
-            previous_response_id=response.id,
-            input=tool_outputs
-        )
+        raise
         
 def reset_conversation():
 
