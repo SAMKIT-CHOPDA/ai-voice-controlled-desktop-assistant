@@ -91,6 +91,13 @@ The result is a practical implementation of a **tool-using AI agent** capable of
 - Media controls
 - Window controls
 - Screenshots
+- Screen understanding
+- Mouse movement and clicking
+- Double-clicking
+- Text typing
+- Keyboard keys and hotkeys
+- Scrolling and drag operations
+- Mouse position detection
 
 ### 📊 System Monitoring
 - Battery status
@@ -100,6 +107,8 @@ The result is a practical implementation of a **tool-using AI agent** capable of
 - Wi-Fi/internet status
 - Screen resolution
 - General system information
+- Context-aware system notifications
+- Background system monitoring
 
 ### 📋 Productivity
 - File search
@@ -107,6 +116,47 @@ The result is a practical implementation of a **tool-using AI agent** capable of
 - Clipboard operations
 - Calculator
 - Date and time
+
+### ⚙️ Smart Process Management
+- List running processes
+- Find processes by name
+- Inspect process details
+- Identify top CPU-consuming processes
+- Identify top memory-consuming processes
+- Close processes
+- Restart processes
+
+### 👨‍💻 Developer Assistant
+- Inspect project structure
+- Read project files
+- Search project code
+- Modify project files when explicitly requested
+- Run Python files
+- Run Python commands
+- Check Git status
+- Inspect Git differences
+
+### 🐍 Python Environment & Package Management
+- Python environment information
+- List installed packages
+- Inspect package information
+- Check package availability
+- Check Python modules
+- Install packages when explicitly requested
+- Uninstall packages when explicitly requested
+- Upgrade packages when explicitly requested
+- Generate requirements files
+- Verify project requirements
+
+### 📝 Audit & Request Logging
+- Records user requests
+- Records assistant responses
+- Records success/error status
+- Records processing duration
+- Generates session identifiers
+- Sanitizes common secrets before logging
+- Stores logs locally in JSON Lines format
+- Keeps logs outside Git through `.gitignore`
 
 ---
 
@@ -204,6 +254,7 @@ Tool Selection
 | python-docx | DOCX extraction |
 | playsound3 | Audio playback |
 | python-dotenv | Environment configuration |
+| PySide6 | Desktop graphical user interface (planned) |
 
 ---
 
@@ -241,6 +292,13 @@ Ai-assistant-voice-controlled/
 | `memory_tools.py` | Persistent long-term memory |
 | `study_tools.py` | Study and quiz functionality |
 | `writing_tools.py` | Writing assistance |
+| `screen_tools.py` | Screen reading and visual understanding |
+| `gui_tools.py` | Mouse and keyboard automation |
+| `notification_tools.py` | Notifications and system monitoring |
+| `developer_tools.py` | Developer/project assistant capabilities |
+| `environment_tools.py` | Python environment and package management |
+| `process_tools.py` | Running-process inspection and management |
+| `audit_logger.py` | Secure local request/response audit logging |
 
 ---
 
@@ -297,6 +355,18 @@ LLM generates final response
 ### 5. Voice Response
 
 The final response is converted to speech using OpenAI TTS and played through the speakers.
+
+### 6. Audit Logging
+
+Every request sent through `ask_llm()` is recorded locally together with the assistant response, status, and processing duration.
+
+Logs are stored in:
+
+```text
+logs/assistant.log
+```
+
+The log uses JSON Lines format so individual requests can be inspected or processed by the future graphical interface. Common secrets are sanitized before being written, and the `logs/` directory is excluded from Git.
 
 ---
 
@@ -385,6 +455,11 @@ The project includes several safety-oriented design choices:
 - File organization uses a preview-before-execution workflow
 - File organization requires explicit confirmation before moving files
 - The LLM cannot directly execute arbitrary Python code through the tool system
+- Developer tools are restricted to the project directory
+- Protected project areas such as `.env`, `.git`, and `.venv` are guarded
+- Package installation/removal/upgrades require explicit user requests
+- Audit logs sanitize common secret patterns
+- Audit logs are excluded from Git
 
 > **Important:** This project can control parts of the local computer. Only run it in an environment where you understand and trust the requested actions.
 
@@ -416,7 +491,7 @@ python -m venv .venv
 ## 3. Activate environment
 
 ```bash
-.venv\Scriptsctivate
+.venv\Scripts\activate
 ```
 
 ## 4. Install dependencies
@@ -513,13 +588,15 @@ python main.py
 - [x] Summarization
 - [x] Email generation
 
-## Phase 5 — Advanced Desktop Agent
+## Phase 5 — Advanced Desktop Agent ✅
 
-- [ ] OCR / screen reading
-- [ ] GUI interaction
-- [ ] Context-aware notifications
-- [ ] Developer assistant
-- [ ] Python/package/environment management
+- [x] Screen reading / visual understanding
+- [x] GUI interaction
+- [x] Context-aware notifications
+- [x] Developer assistant
+- [x] Python/package/environment management
+- [x] Smart process management
+- [x] Audit/request logging
 
 ## Phase 6 — Productivity Integrations
 
@@ -540,7 +617,7 @@ python main.py
 - [ ] More robust multi-step reasoning
 - [ ] Better error recovery
 - [ ] Confirmation for sensitive computer actions
-- [ ] Action and conversation logging
+- [x] Action and conversation logging
 - [ ] Graphical user interface
 - [ ] Conversation history
 - [ ] Visual tool/action status
@@ -554,9 +631,9 @@ python main.py
 
 # 📈 Current Status
 
-**Phase 4 — Intelligence & Productivity: COMPLETE ✅**
+**Backend — COMPLETE ✅**
 
-The project has evolved from a basic voice-controlled desktop utility into a multi-capability AI desktop agent.
+The project has evolved from a basic voice-controlled desktop utility into a multi-capability AI desktop agent with desktop automation, visual understanding, system/process management, developer tooling, Python environment management, notifications, memory, productivity tools, and audit logging.
 
 Current high-level pipeline:
 
@@ -569,15 +646,52 @@ LLM Reasoning
   ↓
 Tool Selection
   ↓
+Python Tools
+  ↓
 Desktop / Web / Files / Documents
-Memory / Study / Writing
+System / Processes / Memory / Study / Writing
   ↓
 LLM Response
+  ↓
+Audit Log
   ↓
 Voice Output
 ```
 
-The next development stage focuses on advanced desktop-agent capabilities including OCR, GUI interaction, context-aware notifications, developer assistance, and Python environment management.
+### Current Development Stage
+
+The complete backend has been implemented and tested. The next major stage is the **graphical frontend**, which will provide a user-friendly desktop interface so the assistant can be used without the command line.
+
+Planned frontend capabilities include:
+
+- Chat interface
+- Voice interaction controls
+- Conversation history
+- Assistant status indicators
+- Tool/action activity display
+- System information dashboard
+- Settings
+- Integration with the existing `ask_llm()` backend
+
+---
+
+# 🧪 Testing
+
+Backend features can be tested directly through `ask_llm()` from the command line.
+
+Example:
+
+```bash
+python -c "from assistant import ask_llm; print(ask_llm('Which process is using the most memory?'))"
+```
+
+For syntax validation:
+
+```bash
+python -m py_compile assistant.py audit_logger.py
+```
+
+The command-line interface is currently the development/test interface. A graphical interface is the next major development stage.
 
 ---
 
