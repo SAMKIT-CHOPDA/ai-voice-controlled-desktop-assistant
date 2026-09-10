@@ -20,6 +20,19 @@ from gui_tools import (
     get_mouse_position,
 )
 
+from environment_tools import (
+    python_info,
+    list_packages,
+    package_info,
+    install_package,
+    uninstall_package,
+    upgrade_package,
+    check_package,
+    generate_requirements,
+    verify_requirements,
+    check_python_module,
+)
+
 from notification_tools import (
     send_notification,
     start_monitoring,
@@ -290,6 +303,16 @@ Your responsibilities:
     and whether verification succeeded.
 94. For development tasks, prefer inspecting the existing implementation
     over guessing how the project is structured.
+95. You can manage the Python environment for the current project.
+96. Python environment tools operate only on the project's .venv when available.
+97. Use python_info to inspect the Python environment.
+98. Use list_packages to inspect installed packages.
+99. Use check_package or check_python_module to determine whether a dependency is available.
+100. Use verify_requirements to diagnose dependency problems.
+101. Use generate_requirements when the user asks to create or update requirements.txt.
+102. Only install, uninstall, or upgrade packages when the user explicitly requests that action.
+103. Never modify the user's .env file, API keys, credentials, .git directory, or system Python environment.
+104. When a package installation fails, report the actual error instead of claiming it succeeded.
 
 
 Important tool rules:
@@ -474,6 +497,200 @@ TOOLS = [
     },
     "strict": True
 },
+
+
+    # ---------------------------------------------------------
+    # PYTHON ENVIRONMENT & PACKAGE MANAGEMENT
+    # ---------------------------------------------------------
+
+    {
+        "type": "function",
+        "name": "python_info",
+        "description": (
+            "Show information about the project's Python environment, "
+            "including Python version, pip version, and environment."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "list_packages",
+        "description": (
+            "List all Python packages installed in the project's "
+            "virtual environment."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "package_info",
+        "description": (
+            "Show detailed information about a specific installed "
+            "Python package."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "package": {
+                    "type": "string",
+                    "description": "Python package name."
+                }
+            },
+            "required": ["package"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "install_package",
+        "description": (
+            "Install a Python package into the project's virtual "
+            "environment. Use only when the user explicitly asks "
+            "to install a package."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "package": {
+                    "type": "string",
+                    "description": "Python package to install."
+                }
+            },
+            "required": ["package"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "uninstall_package",
+        "description": (
+            "Uninstall a Python package from the project's virtual "
+            "environment. Use only when the user explicitly asks "
+            "to uninstall a package."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "package": {
+                    "type": "string",
+                    "description": "Python package to uninstall."
+                }
+            },
+            "required": ["package"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "upgrade_package",
+        "description": (
+            "Upgrade a Python package in the project's virtual "
+            "environment. Use only when the user explicitly asks "
+            "to upgrade a package."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "package": {
+                    "type": "string",
+                    "description": "Python package to upgrade."
+                }
+            },
+            "required": ["package"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "check_package",
+        "description": (
+            "Check whether a Python package is installed and return "
+            "its details if available."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "package": {
+                    "type": "string",
+                    "description": "Python package name."
+                }
+            },
+            "required": ["package"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "generate_requirements",
+        "description": (
+            "Generate or update requirements.txt using the packages "
+            "installed in the project's Python environment."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "verify_requirements",
+        "description": (
+            "Check the project's Python environment for dependency "
+            "problems using pip check."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+
+    {
+        "type": "function",
+        "name": "check_python_module",
+        "description": (
+            "Check whether a Python module can be imported in the "
+            "project's Python environment."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "module": {
+                    "type": "string",
+                    "description": "Python module name to check."
+                }
+            },
+            "required": ["module"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
 
     # ---------------------------------------------------------
     # NOTIFICATION TOOLS
@@ -2043,6 +2260,62 @@ def ask_llm(user_text):
             elif call.name == "git_diff":
 
                 result = git_diff()
+                
+            # -------------------------------------------------
+            # PYTHON ENVIRONMENT & PACKAGE MANAGEMENT
+            # -------------------------------------------------
+
+            elif call.name == "python_info":
+
+                result = python_info()
+
+            elif call.name == "list_packages":
+
+                result = list_packages()
+
+            elif call.name == "package_info":
+
+                result = package_info(
+                    arguments["package"]
+                )
+
+            elif call.name == "install_package":
+
+                result = install_package(
+                    arguments["package"]
+                )
+
+            elif call.name == "uninstall_package":
+
+                result = uninstall_package(
+                    arguments["package"]
+                )
+
+            elif call.name == "upgrade_package":
+
+                result = upgrade_package(
+                    arguments["package"]
+                )
+
+            elif call.name == "check_package":
+
+                result = check_package(
+                    arguments["package"]
+                )
+
+            elif call.name == "generate_requirements":
+
+                result = generate_requirements()
+
+            elif call.name == "verify_requirements":
+
+                result = verify_requirements()
+
+            elif call.name == "check_python_module":
+
+                result = check_python_module(
+                    arguments["module"]
+                )
             
             # -------------------------------------------------
             # LONG-TERM MEMORY
