@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from document_tools import find_document, read_document
 from file_organization_tools import organize_folder
+from screen_tools import read_screen
 
 from memory_tools import (
     save_memory,
@@ -182,6 +183,15 @@ Your responsibilities:
     experiences when writing emails or other personal content.
 52. Keep writing responses appropriate for spoken conversation
     unless the user explicitly asks for a longer written output.
+53. Use read_screen with mode "text" when the user asks you to read,
+    extract, or identify text visible on the current screen.
+54. Use read_screen with mode "describe" when the user asks what is
+    currently on the screen, what application is open, or asks you
+    to describe or inspect the current screen.
+55. Use take_screenshot when the user specifically asks to take,
+    capture, or save a screenshot.
+56. Do not use take_screenshot when the user wants you to understand
+    or read the current screen; use read_screen instead.
 
 Important tool rules:
 
@@ -190,6 +200,9 @@ Important tool rules:
 - Use volume_control for increasing or decreasing volume.
 - Use mute_unmute when the user explicitly asks to mute or unmute.
 - Use take_screenshot when the user asks for a screenshot.
+- Use read_screen with mode "text" when the user asks you to read or extract text visible on the current screen.
+- Use read_screen with mode "describe" when the user asks what is on the screen, what application is open, or asks you to describe or inspect the current screen.
+- Do not use take_screenshot when the user wants you to understand or read the screen; use read_screen instead.
 - Use media_control for play, pause, next track, or previous track.
 - Use window_control for minimizing, maximizing, or restoring the active window.
 - Use search_files when the user asks to find a file.
@@ -1024,6 +1037,33 @@ TOOLS = [
         },
         "strict": True
     },
+    
+    {
+        "type": "function",
+        "name": "read_screen",
+        "description": (
+            "Capture and analyze the current screen using vision. "
+            "Use this when the user asks to read, understand, "
+            "describe, or inspect what is currently visible on the screen."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "type": "string",
+                    "enum": ["text", "describe"],
+                    "description": (
+                        "Use 'text' to extract visible text. "
+                        "Use 'describe' to describe the screen, "
+                        "including the active application and important UI elements."
+                    )
+                }
+            },
+            "required": ["mode"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
 
 
     # ---------------------------------------------------------
@@ -1353,6 +1393,9 @@ def ask_llm(user_text):
             elif call.name == "take_screenshot":
 
                 result = take_screenshot()
+                
+            elif call.name == "read_screen":
+                result = read_screen(arguments["mode"])
 
             elif call.name == "media_control":
 
