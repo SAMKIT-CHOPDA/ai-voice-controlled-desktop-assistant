@@ -8,6 +8,7 @@ from document_tools import find_document, read_document
 from file_organization_tools import organize_folder
 from screen_tools import read_screen
 import time
+import threading
 
 from audit_logger import (
     log_request,
@@ -49,6 +50,9 @@ from environment_tools import (
     verify_requirements,
     check_python_module,
 )
+
+from jev import execute_jev
+from model_router import resolve_model_for_query
 
 from notification_tools import (
     send_notification,
@@ -117,6 +121,7 @@ from tools import (
     clipboard_set
 )
 
+stop_event = threading.Event()
 
 # =============================================================
 # OPENAI SETUP
@@ -125,7 +130,9 @@ from tools import (
 load_dotenv()
 
 client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY")
+    api_key=os.getenv("OPENAI_API_KEY"),
+    timeout=20.0,
+    max_retries=1,
 )
 
 MODEL = "gpt-5.6-luna"
@@ -155,7 +162,24 @@ Your responsibilities:
 8. If the request is a normal question, answer it directly.
 9. Do not use tools when they are unnecessary.
 10. Keep spoken responses concise and natural.
-11. Do not mention internal tools, function calls, APIs, or system architecture
+
+11. Voice response length rules:
+    - Simple factual or conversational questions: 1–2 sentences.
+    - Normal explanations: 2–4 sentences.
+    - Complex questions: 4–6 sentences maximum.
+    - Do not provide long essays unless the user explicitly asks for a detailed answer.
+    - Do not repeat the question.
+    - Do not add unnecessary background information.
+    - Give only the information needed to answer the user's request.
+    - Prefer a short complete answer over a comprehensive answer.
+    - The fact that a question is complex does not mean the spoken response
+      should be long.
+
+12. The response is intended to be spoken aloud.
+    Do not use Markdown, tables, long lists, headings, or unnecessary examples
+    unless the user explicitly requests them.
+
+13. Do not mention internal tools, function calls, APIs, or system architecture
     unless the user specifically asks.
 12. The user speaks English.
 13. When the user asks for current, recent, live, latest, or up-to-date
@@ -349,6 +373,23 @@ Important tool rules:
 - Use read_notes when the user asks about saved notes.
 - Use clipboard_get when the user asks what is currently copied.
 - Use clipboard_set when the user asks you to copy something.
+
+IMPORTANT COMPUTER-CONTROL RULES:
+
+- For browser tasks, prefer direct interaction using keyboard and mouse tools.
+- When the user asks to open a website and perform actions on it, do not use
+  read_screen unless visual information is actually required to determine
+  what to click or where an element is located.
+- Prefer keyboard navigation, typing, hotkeys, and direct browser interaction
+  whenever the requested task can be completed without reading the screen.
+- Do not call read_screen merely to verify that a website has opened.
+- For YouTube tasks, prefer opening YouTube, using the search field, typing
+  the requested channel/video name, and navigating using keyboard or mouse
+  actions.
+- Complete multi-step computer tasks instead of stopping after opening the
+  website.
+- Continue using tools until the user's requested computer action is
+  completed.
 """
 
 
@@ -2120,6 +2161,14 @@ TOOLS = [
     }
 ]
 
+def stop_current_action():
+    """Request the currently running assistant action to stop."""
+    stop_event.set()
+
+
+def reset_stop():
+    """Clear the emergency stop flag before starting a new request."""
+    stop_event.clear()
 
 # =============================================================
 # LLM FUNCTION
@@ -2128,8 +2177,46 @@ TOOLS = [
 def ask_llm(user_text):
 
     global conversation_response_id
+    
+    reset_stop()
 
     start_time = time.time()
+    tool_rounds = 0
+    MAX_TOOL_ROUNDS = 8
+
+    # ---------------------------------------------------------
+    # FAST JEV ROUTING
+    # ---------------------------------------------------------
+    # JEV handles high-confidence deterministic requests directly.
+    # Complex/uncertain requests return None and continue to OpenAI.
+    try:
+        jev_start = time.perf_counter()
+        jev_result = execute_jev(user_text)
+        if jev_result is not None:
+            elapsed = time.perf_counter() - jev_start
+            print(f"[JEV TOTAL] request={elapsed:.3f}s")
+            log_response(
+                jev_result,
+                status="success",
+                duration=elapsed
+            )
+            return jev_result
+    except Exception as exc:
+        print(f"[JEV] unexpected error: {type(exc).__name__}: {exc}")
+        # Never let the fast router break the normal LLM path.
+
+    # ---------------------------------------------------------
+    # JEV LEVEL 2: MODEL ROUTING
+    # ---------------------------------------------------------
+    # Level-1 JEV has already handled deterministic commands above.
+    # Only GENERAL_LLM requests reach this point.
+    model_profile = resolve_model_for_query(user_text)
+    selected_model = model_profile.model
+    selected_reasoning = model_profile.reasoning_effort
+    print(
+        f"[JEV L2] level={model_profile.level.value} "
+        f"model={selected_model} reasoning={selected_reasoning}"
+    )
 
     # ---------------------------------------------------------
     # AUDIT LOG: USER REQUEST
@@ -2146,53 +2233,45 @@ def ask_llm(user_text):
         if conversation_response_id is None:
 
             response = client.responses.create(
-                model=MODEL,
+                model=selected_model,
                 instructions=SYSTEM_PROMPT,
                 tools=TOOLS,
-                input=user_text
+                input=user_text,
+                reasoning={"effort": selected_reasoning},
+                text={"verbosity": "low"}
             )
 
         else:
 
             response = client.responses.create(
-                model=MODEL,
+                model=selected_model,
                 instructions=SYSTEM_PROMPT,
                 tools=TOOLS,
                 previous_response_id=conversation_response_id,
-                input=user_text
+                input=user_text,
+                reasoning={"effort": selected_reasoning},
+                text={"verbosity": "low"}
             )
 
         # -----------------------------------------------------
         # TOOL EXECUTION LOOP
         # -----------------------------------------------------
 
-        MAX_TOOL_ROUNDS = 15
-        tool_round = 0
 
         while True:
 
-            tool_round += 1
-
             # -------------------------------------------------
-            # MAX TOOL ROUND SAFETY
+            # EMERGENCY STOP CHECK
             # -------------------------------------------------
 
-            if tool_round > MAX_TOOL_ROUNDS:
-
+            if stop_event.is_set():
                 conversation_response_id = response.id
-
-                answer = (
-                    "I reached the maximum number of steps "
-                    "while processing your request."
-                )
-
                 log_response(
-                    answer,
-                    status="limit_reached",
+                    "Action stopped by user.",
+                    status="stopped",
                     duration=time.time() - start_time
                 )
-
-                return answer
+                return "Action stopped."
 
             # -------------------------------------------------
             # FIND TOOL CALLS
@@ -2231,9 +2310,29 @@ def ask_llm(user_text):
             # EXECUTE TOOLS
             # -------------------------------------------------
 
+            tool_rounds += 1
+            if tool_rounds > MAX_TOOL_ROUNDS:
+                conversation_response_id = response.id
+                log_response(
+                    "I stopped because the action required too many tool steps.",
+                    status="stopped",
+                    duration=time.time() - start_time
+                )
+                return "I stopped the action because it required too many steps."
+
             tool_outputs = []
 
             for call in tool_calls:
+
+                # STOP CHECK BEFORE EVERY TOOL
+                if stop_event.is_set():
+                    conversation_response_id = response.id
+                    log_response(
+                        "Action stopped by user.",
+                        status="stopped",
+                        duration=time.time() - start_time
+                    )
+                    return "Action stopped."
 
                 arguments = json.loads(call.arguments)
 
@@ -2759,15 +2858,30 @@ def ask_llm(user_text):
                 })
 
             # -----------------------------------------------------
+            # STOP CHECK BEFORE NEXT LLM ROUND
+            # -----------------------------------------------------
+
+            if stop_event.is_set():
+                conversation_response_id = response.id
+                log_response(
+                    "Action stopped by user.",
+                    status="stopped",
+                    duration=time.time() - start_time
+                )
+                return "Action stopped."
+
+            # -----------------------------------------------------
             # ASK LLM FOR FINAL RESPONSE
             # -----------------------------------------------------
 
             response = client.responses.create(
-                model=MODEL,
+                model=selected_model,
                 instructions=SYSTEM_PROMPT,
                 tools=TOOLS,
                 previous_response_id=response.id,
-                input=tool_outputs
+                input=tool_outputs,
+                reasoning={"effort": selected_reasoning},
+                text={"verbosity": "low"}
             )
 
     # ---------------------------------------------------------

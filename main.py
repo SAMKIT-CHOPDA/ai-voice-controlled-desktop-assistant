@@ -1,4 +1,5 @@
 import string
+import time
 
 from wake_word import record_command, transcribe
 from assistant import ask_llm
@@ -14,19 +15,10 @@ print()
 
 while True:
 
-    # -----------------------------------------
-    # LISTEN
-    # -----------------------------------------
-
     audio = record_command()
 
     if audio is None:
         continue
-
-
-    # -----------------------------------------
-    # SPEECH → TEXT
-    # -----------------------------------------
 
     text = transcribe(audio)
 
@@ -34,14 +26,10 @@ while True:
     print("You said:", text)
     print()
 
+    request_start = time.perf_counter()
 
     if not text:
         continue
-
-
-    # -----------------------------------------
-    # EXIT
-    # -----------------------------------------
 
     clean_text = text.lower().strip().translate(
         str.maketrans("", "", string.punctuation)
@@ -54,16 +42,9 @@ while True:
     ]:
 
         speak("Goodbye.")
-
         break
 
-
-    # -----------------------------------------
-    # LLM
-    # -----------------------------------------
-
     try:
-
         response = ask_llm(text)
 
     except Exception as e:
@@ -76,11 +57,10 @@ while True:
 
         continue
 
-
-    # -----------------------------------------
-    # SPEAK RESPONSE
-    # -----------------------------------------
-
     if response:
-
         speak(response)
+
+    print(
+        f"[TOTAL] request_to_audio_complete="
+        f"{time.perf_counter() - request_start:.3f}s"
+    )

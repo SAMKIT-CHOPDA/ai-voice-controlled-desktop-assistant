@@ -82,13 +82,24 @@ def open_application(application: str):
 def open_website(url: str):
 
     try:
+        if not url:
+            return "I couldn't open the website because no URL was provided."
 
-        webbrowser.open(url)
+        if platform.system() == "Windows":
+            # Start the URL through Windows without waiting for the browser.
+            subprocess.Popen(
+                ["cmd", "/c", "start", "", url],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        else:
+            if not webbrowser.open(url, new=0):
+                return f"I couldn't open {url}."
 
         return f"I opened {url}."
 
     except Exception as e:
-
         return f"I couldn't open the website. Error: {e}"
 
 
@@ -99,20 +110,88 @@ def open_website(url: str):
 def search_web(query: str):
 
     try:
+        if not query:
+            return "I couldn't search because the query was empty."
 
         url = (
             "https://www.google.com/search?q="
             + quote_plus(query)
         )
 
-        webbrowser.open(url)
+        result = open_website(url)
+        if result.startswith("I couldn't"):
+            return result
 
-        return f"I searched Google for {query}."
+        return f"Google search opened for {query}."
 
     except Exception as e:
-
         return f"I couldn't perform the search. Error: {e}"
 
+
+# ============================================================
+# YOUTUBE PLAYBACK
+# ============================================================
+
+def play_youtube(query: str, index: int = 1):
+    """
+    Search YouTube and open the selected result directly.
+
+    This does NOT download the video.
+    It resolves the YouTube video URL and opens it in the browser.
+    """
+
+    try:
+        query = query.strip()
+
+        if not query:
+            return "I couldn't play the YouTube video because the search query was empty."
+
+        if index < 1:
+            index = 1
+
+        import yt_dlp
+
+        search_term = f"ytsearch{index}:{query}"
+
+        options = {
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            "extract_flat": True,
+            "noplaylist": True,
+        }
+
+        with yt_dlp.YoutubeDL(options) as ydl:
+            info = ydl.extract_info(
+                search_term,
+                download=False
+            )
+
+        entries = info.get("entries") or []
+
+        if len(entries) < index:
+            return f"I couldn't find video {index} for {query} on YouTube."
+
+        video = entries[index - 1]
+
+        video_url = (
+            video.get("webpage_url")
+            or video.get("url")
+        )
+
+        if not video_url:
+            return "I found the video but couldn't open it."
+
+        result = open_website(video_url)
+
+        if result.startswith("I couldn't"):
+            return result
+
+        return "The YouTube video is playing."
+
+    except Exception as e:
+        print(f"[YOUTUBE PLAY] error: {type(e).__name__}: {e}")
+        return "I couldn't find or open that YouTube video."
 
 # ============================================================
 # CURRENT TIME
@@ -570,10 +649,10 @@ def take_screenshot():
 
         screenshot.save(filepath)
 
-        return (
-            f"Screenshot saved successfully "
-            f"as {filename}."
-        )
+        if not os.path.isfile(filepath) or os.path.getsize(filepath) == 0:
+            return "I couldn't verify that the screenshot was saved."
+
+        return f"Screenshot saved successfully at {filepath}."
 
     except Exception as e:
 
